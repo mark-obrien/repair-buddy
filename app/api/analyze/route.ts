@@ -134,7 +134,7 @@ export async function POST(request: Request) {
       );
     }
     return NextResponse.json(
-      { error: 'Failed to generate repair guide. Please try again.' },
+      { error: `Failed to generate repair guide: ${msg}` },
       { status: 500 }
     );
   }
