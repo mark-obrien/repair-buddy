@@ -1,36 +1,116 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Repair Buddy
 
-## Getting Started
+Paste a YouTube repair video URL and get an AI-generated companion guide — parts list, tools, torque specs, step-by-step instructions, warnings, and visual diagrams.
 
-First, run the development server:
+## Features
+
+- Structured repair guides from YouTube video transcripts
+- Parts list with part numbers, quantities, and notes
+- Standard and specialty tools with sizes and DIY alternatives
+- Torque specifications extracted verbatim (safety-critical)
+- Numbered repair steps with inline warnings
+- Mermaid process flowchart
+- SVG parts diagram with labeled components
+- Video frame extraction for more accurate diagrams
+- Whisper speech-to-text fallback for videos without captions
+- Multi-provider AI: Anthropic, OpenAI, Google
+- Transcript caching (in-memory + optional Redis)
+
+---
+
+## Local Development
+
+### Prerequisites
+
+- Node.js 20+
+- ffmpeg installed system-wide (`brew install ffmpeg` / `apt install ffmpeg`)
+- At least one AI provider API key
+
+### Setup
+
+```bash
+git clone <repo>
+cd repair-buddy
+
+npm install
+
+cp .env.example .env.local
+# Edit .env.local — add at minimum ANTHROPIC_API_KEY
+```
+
+### Environment variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | One of these three | Claude models |
+| `OPENAI_API_KEY` | One of these three | GPT-4o models + Whisper transcription |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | One of these three | Gemini models |
+| `REDIS_URL` | No | Transcript cache (e.g. `redis://localhost:6379`) |
+| `FFMPEG_PATH` | No | Override ffmpeg binary path (default: auto-detected) |
+
+### Run
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Production (Docker)
 
-## Learn More
+The Docker setup uses system ffmpeg so frame extraction and speech-to-text work reliably without any binary path issues. Redis is included for transcript caching.
 
-To learn more about Next.js, take a look at the following resources:
+### Prerequisites
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Docker and Docker Compose
+- API key(s) for at least one AI provider
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Setup
 
-## Deploy on Vercel
+```bash
+cp .env.example .env.local
+# Edit .env.local with your API keys
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Run
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+docker compose up --build
+```
+
+Open [http://localhost:6788](http://localhost:6788).
+
+To run in the background:
+
+```bash
+docker compose up --build -d
+docker compose logs -f   # tail logs
+docker compose down      # stop
+```
+
+### Environment variables in production
+
+Pass keys via `.env.local` (Docker Compose reads it automatically) or export them in your shell before running `docker compose up`:
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+export OPENAI_API_KEY=sk-...
+docker compose up --build -d
+```
+
+### Updating
+
+```bash
+git pull
+docker compose up --build -d
+```
+
+---
+
+## Notes
+
+- **Videos without captions**: the app falls back to OpenAI Whisper (requires `OPENAI_API_KEY`). On environments without ffmpeg this fallback is unavailable — the video must have YouTube captions.
+- **Frame extraction**: requires ffmpeg. Skipped silently if unavailable — the guide still generates from the transcript alone.
+- **Model selection**: each request can specify provider and model via the UI. The research pre-pass always uses the cheapest model in the selected provider family.
