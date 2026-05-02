@@ -1,11 +1,25 @@
 import ytdl from '@distube/ytdl-core';
 import ffmpeg from 'fluent-ffmpeg';
-import ffmpegStatic from 'ffmpeg-static';
+import path from 'path';
+import fs from 'fs';
 import { PassThrough } from 'stream';
 
-// Point fluent-ffmpeg at the static binary
-if (ffmpegStatic) {
-  ffmpeg.setFfmpegPath(ffmpegStatic);
+// Resolve the ffmpeg binary path at runtime via require.resolve so the path
+// is always relative to the actual loaded module location, not a bundled __dirname.
+function resolveFfmpegPath(): string | null {
+  if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
+  try {
+    const pkgDir = path.dirname(require.resolve('ffmpeg-static/package.json'));
+    const bin = path.join(pkgDir, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+    return fs.existsSync(bin) ? bin : null;
+  } catch {
+    return null;
+  }
+}
+
+const ffmpegBin = resolveFfmpegPath();
+if (ffmpegBin) {
+  ffmpeg.setFfmpegPath(ffmpegBin);
 }
 
 const FRAME_COUNT = 8;
@@ -21,6 +35,10 @@ export async function extractVideoFrames(
   videoUrl: string,
   fallbackDurationSeconds: number
 ): Promise<FrameExtractionResult> {
+  if (!ffmpegBin) {
+    throw new FrameExtractionError('ffmpeg binary not found — frame extraction unavailable in this environment');
+  }
+
   // Get video info and direct stream URL
   let streamUrl: string;
   let durationSeconds = fallbackDurationSeconds;

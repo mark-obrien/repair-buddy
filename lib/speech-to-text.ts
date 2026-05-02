@@ -1,13 +1,26 @@
 // Speech-to-text transcription using OpenAI Whisper
 import ytdl from '@distube/ytdl-core';
 import ffmpeg from 'fluent-ffmpeg';
-import ffmpegStatic from 'ffmpeg-static';
-import fs from 'fs';
 import path from 'path';
+import fs from 'fs';
 import OpenAI from 'openai';
 
-if (ffmpegStatic) {
-  ffmpeg.setFfmpegPath(ffmpegStatic);
+// Resolve the ffmpeg binary path at runtime — same logic as frames.ts so both
+// modules share the same resolution strategy rather than relying on ffmpeg-static's __dirname.
+function resolveFfmpegPath(): string | null {
+  if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
+  try {
+    const pkgDir = path.dirname(require.resolve('ffmpeg-static/package.json'));
+    const bin = path.join(pkgDir, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+    return fs.existsSync(bin) ? bin : null;
+  } catch {
+    return null;
+  }
+}
+
+const ffmpegBin = resolveFfmpegPath();
+if (ffmpegBin) {
+  ffmpeg.setFfmpegPath(ffmpegBin);
 }
 
 function getOpenAIClient(): OpenAI {
@@ -28,12 +41,16 @@ export class SpeechToTextError extends Error {
 }
 
 async function extractAudio(videoUrl: string): Promise<string> {
+  if (!ffmpegBin) {
+    throw new SpeechToTextError('ffmpeg binary not found — speech-to-text is unavailable in this environment. Set the FFMPEG_PATH environment variable to enable it.');
+  }
+
   return new Promise((resolve, reject) => {
     const tempFile = path.join('/tmp', `audio-${Date.now()}.mp3`);
 
     try {
       const stream = ytdl(videoUrl, { quality: 'lowest' });
-      
+
       ffmpeg(stream)
         .toFormat('mp3')
         .audioFrequency(16000)
