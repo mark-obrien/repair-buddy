@@ -1,7 +1,6 @@
-// Caching layer with Redis and in-memory fallback
 import { createClient } from 'redis';
 
-const CACHE_TTL = 86400; // 24 hours
+const CACHE_TTL = 86400;
 
 let redisClient: any = null;
 let isRedisAvailable = false;
@@ -26,14 +25,12 @@ export async function getCachedTranscript(videoId: string): Promise<string | nul
   const key = `transcript:${videoId}`;
   const now = Date.now();
 
-  // Check memory cache
   const cached = memoryCache.get(key);
   if (cached && cached.expiry > now) {
     console.log(`✓ Cache hit (memory): ${videoId}`);
     return cached.value;
   }
 
-  // Check Redis
   if (isRedisAvailable && redisClient) {
     try {
       const result = await redisClient.get(key);
@@ -54,10 +51,8 @@ export async function cacheTranscript(videoId: string, transcript: string): Prom
   const key = `transcript:${videoId}`;
   const now = Date.now();
 
-  // Store in memory
   memoryCache.set(key, { value: transcript, expiry: now + CACHE_TTL * 1000 });
 
-  // Store in Redis
   if (isRedisAvailable && redisClient) {
     try {
       await redisClient.setEx(key, CACHE_TTL, transcript);
@@ -72,5 +67,4 @@ export async function initCache() {
   await initRedis();
 }
 
-// Initialize on module load
 initCache().catch(console.error);
