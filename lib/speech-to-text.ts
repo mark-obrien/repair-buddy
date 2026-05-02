@@ -10,9 +10,12 @@ if (ffmpegStatic) {
   ffmpeg.setFfmpegPath(ffmpegStatic);
 }
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+function getOpenAIClient(): OpenAI {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new SpeechToTextError('OPENAI_API_KEY is not configured — cannot use speech-to-text fallback.');
+  }
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+}
 
 const AUDIO_TIMEOUT_MS = 60000; // 60 seconds
 const MAX_AUDIO_SIZE = 25 * 1024 * 1024; // 25MB (Whisper limit)
@@ -68,7 +71,7 @@ export async function transcribeSpeech(videoUrl: string): Promise<{ text: string
     console.log(`🎤 Transcribing audio (${Math.round(stats.size / 1024 / 1024)}MB)...`);
 
     // Send to Whisper API
-    const transcript = await openai.audio.transcriptions.create({
+    const transcript = await getOpenAIClient().audio.transcriptions.create({
       file: fs.createReadStream(audioFile),
       model: 'whisper-1',
       language: 'en',
