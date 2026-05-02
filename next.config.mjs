@@ -1,10 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Keep native/binary packages external so __dirname resolves from node_modules, not the bundle
-  serverExternalPackages: ['fluent-ffmpeg', 'ffmpeg-static', '@distube/ytdl-core'],
-
   experimental: {
-    // Ensure the ffmpeg binary is included in the deployment file trace
+    // Next.js 14: keep binary packages external so __dirname resolves from
+    // node_modules at runtime, not from inside the webpack bundle
+    serverComponentsExternalPackages: ['fluent-ffmpeg', 'ffmpeg-static', '@distube/ytdl-core'],
+
+    // Ensure the ffmpeg binary is copied into the deployment file trace
     outputFileTracingIncludes: {
       '/api/analyze': ['./node_modules/ffmpeg-static/**/*'],
     },
