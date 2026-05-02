@@ -1,8 +1,8 @@
-import { createClient } from 'redis';
+import { createClient, RedisClientType } from 'redis';
 
 const CACHE_TTL = 86400;
 
-let redisClient: any = null;
+let redisClient: RedisClientType | null = null;
 let isRedisAvailable = false;
 
 async function initRedis() {

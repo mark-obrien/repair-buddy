@@ -1,6 +1,6 @@
 'use client';
 
-import { PROVIDERS, DEFAULT_PROVIDER, DEFAULT_MODEL } from '@/lib/providers';
+import { PROVIDERS } from '@/lib/providers';
 
 interface Props {
   providerId: string;
