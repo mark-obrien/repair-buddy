@@ -2,7 +2,12 @@ import { YoutubeTranscript, YoutubeTranscriptError } from 'youtube-transcript';
 
 const MAX_CHARS = 80_000;
 
-export async function fetchAndFormatTranscript(videoId: string): Promise<string> {
+export interface TranscriptResult {
+  text: string;
+  durationSeconds: number;
+}
+
+export async function fetchAndFormatTranscript(videoId: string): Promise<TranscriptResult> {
   let items;
   try {
     items = await YoutubeTranscript.fetchTranscript(videoId);
@@ -27,13 +32,18 @@ export async function fetchAndFormatTranscript(videoId: string): Promise<string>
     throw err;
   }
 
+  // Estimate video duration from last transcript item's offset + duration
+  const lastItem = items[items.length - 1];
+  const durationSeconds = lastItem
+    ? Math.ceil((lastItem.offset + lastItem.duration) / 1000)
+    : 0;
+
   const full = items.map((item) => item.text).join(' ');
+  const trimmed = full.length > MAX_CHARS
+    ? full.slice(0, full.lastIndexOf(' ', MAX_CHARS) || MAX_CHARS)
+    : full;
 
-  if (full.length <= MAX_CHARS) return full;
-
-  const trimmed = full.slice(0, MAX_CHARS);
-  const lastSpace = trimmed.lastIndexOf(' ');
-  return lastSpace > 0 ? trimmed.slice(0, lastSpace) : trimmed;
+  return { text: trimmed, durationSeconds };
 }
 
 export class TranscriptUnavailableError extends Error {

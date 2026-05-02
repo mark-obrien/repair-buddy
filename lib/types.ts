@@ -43,4 +43,5 @@ export interface AnalyzeRequest {
 export interface AnalyzeResponse {
   guide?: RepairGuide;
   error?: string;
+  framesAnalyzed?: number;
 }

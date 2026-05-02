@@ -12,12 +12,14 @@ type Status = 'idle' | 'loading' | 'success' | 'error';
 export default function Home() {
   const [status, setStatus] = useState<Status>('idle');
   const [guide, setGuide] = useState<RepairGuide | null>(null);
+  const [framesAnalyzed, setFramesAnalyzed] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(url: string) {
     setStatus('loading');
     setError(null);
     setGuide(null);
+    setFramesAnalyzed(0);
 
     try {
       const res = await fetch('/api/analyze', {
@@ -35,6 +37,7 @@ export default function Home() {
       }
 
       setGuide(data.guide);
+      setFramesAnalyzed(data.framesAnalyzed ?? 0);
       setStatus('success');
     } catch {
       setError('Network error. Please check your connection and try again.');
@@ -65,15 +68,34 @@ export default function Home() {
 
         {status === 'loading' && <LoadingState />}
         {status === 'error' && error && <ErrorAlert message={error} />}
-        {status === 'success' && guide && <GuideResults guide={guide} />}
+        {status === 'success' && guide && (
+          <>
+            {framesAnalyzed > 0 ? (
+              <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                <span>🎬</span>
+                <span>
+                  Parts diagram generated from <strong>{framesAnalyzed} video frames</strong> — layout reflects actual video content.
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                <span>⚠️</span>
+                <span>
+                  Video frame extraction was unavailable — parts diagram is based on transcript and general knowledge.
+                </span>
+              </div>
+            )}
+            <GuideResults guide={guide} />
+          </>
+        )}
 
         {status === 'idle' && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
             {[
               {
-                icon: '🔩',
-                title: 'Parts & Part Numbers',
-                desc: 'OEM and aftermarket parts with quantities',
+                icon: '🎬',
+                title: 'Video Frame Analysis',
+                desc: 'Actual frames extracted and analyzed for accurate part diagrams',
               },
               {
                 icon: '⚙️',
@@ -81,9 +103,9 @@ export default function Home() {
                 desc: 'Every torque value mentioned in the video',
               },
               {
-                icon: '📋',
-                title: 'Step-by-Step Guide',
-                desc: 'Structured repair steps with inline warnings',
+                icon: '🔩',
+                title: 'Parts & Tools',
+                desc: 'OEM part numbers, standard and specialty tools',
               },
             ].map((f) => (
               <div key={f.title} className="bg-white rounded-lg border border-gray-200 p-4">

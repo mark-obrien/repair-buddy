@@ -4,10 +4,12 @@ import { useEffect, useState } from 'react';
 
 const MESSAGES = [
   'Fetching video transcript…',
-  'Analyzing repair procedure…',
-  'Extracting parts and tools…',
-  'Identifying torque specifications…',
-  'Generating process diagram…',
+  'Extracting video frames…',
+  'Analyzing video frames…',
+  'Identifying parts and tools…',
+  'Extracting torque specifications…',
+  'Generating parts diagram from frames…',
+  'Building process flow…',
   'Almost done…',
 ];
 
@@ -28,7 +30,9 @@ export function LoadingState() {
         <span className="absolute inset-0 flex items-center justify-center text-2xl">🔧</span>
       </div>
       <p className="text-gray-600 text-base font-medium animate-pulse">{MESSAGES[index]}</p>
-      <p className="text-sm text-gray-400">This usually takes 20–40 seconds for longer videos.</p>
+      <p className="text-sm text-gray-400">
+        Analyzing transcript and video frames — usually 30–50 seconds.
+      </p>
     </div>
   );
 }

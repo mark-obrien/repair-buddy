@@ -5,11 +5,35 @@ import {
   TranscriptUnavailableError,
   TranscriptRateLimitError,
 } from '@/lib/transcript';
+import { extractVideoFrames, FrameExtractionError } from '@/lib/frames';
 import { generateRepairGuide } from '@/lib/claude';
 import Anthropic from '@anthropic-ai/sdk';
 
 export const maxDuration = 60;
 export const runtime = 'nodejs';
+
+// 25-second budget for frame extraction — falls back gracefully if exceeded
+const FRAME_TIMEOUT_MS = 25_000;
+
+async function tryExtractFrames(videoUrl: string, durationSeconds: number): Promise<string[]> {
+  try {
+    const result = await Promise.race([
+      extractVideoFrames(videoUrl, durationSeconds),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Frame extraction budget exceeded')), FRAME_TIMEOUT_MS)
+      ),
+    ]);
+    console.log(`Extracted ${result.frames.length} frames from video`);
+    return result.frames;
+  } catch (err) {
+    // Non-fatal — log and continue without frames
+    const reason = err instanceof FrameExtractionError || err instanceof Error
+      ? err.message
+      : 'unknown';
+    console.warn(`Frame extraction skipped: ${reason}`);
+    return [];
+  }
+}
 
 export async function POST(request: Request) {
   let body: { url?: string };
@@ -32,14 +56,19 @@ export async function POST(request: Request) {
     );
   }
 
+  // Fetch metadata and transcript in parallel
   let metadata: { title: string; thumbnailUrl: string };
-  let transcript: string;
+  let transcriptText: string;
+  let durationSeconds: number;
 
   try {
-    [metadata, transcript] = await Promise.all([
+    const [meta, transcriptResult] = await Promise.all([
       getVideoMetadata(videoId),
       fetchAndFormatTranscript(videoId),
     ]);
+    metadata = meta;
+    transcriptText = transcriptResult.text;
+    durationSeconds = transcriptResult.durationSeconds;
   } catch (err) {
     if (err instanceof TranscriptRateLimitError) {
       return NextResponse.json({ error: err.message }, { status: 429 });
@@ -54,14 +83,18 @@ export async function POST(request: Request) {
     );
   }
 
+  // Attempt frame extraction — non-fatal if it fails
+  const frames = await tryExtractFrames(url.trim(), durationSeconds);
+
   try {
     const guide = await generateRepairGuide(
-      transcript,
+      transcriptText,
       metadata.title,
       url.trim(),
-      metadata.thumbnailUrl
+      metadata.thumbnailUrl,
+      frames
     );
-    return NextResponse.json({ guide });
+    return NextResponse.json({ guide, framesAnalyzed: frames.length });
   } catch (err) {
     if (err instanceof Anthropic.APIError) {
       if (err.status === 401) {

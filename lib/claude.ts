@@ -32,7 +32,7 @@ PROCESS DIAGRAM: Generate a syntactically valid Mermaid flowchart that shows the
 - Represent 8 to 15 key steps — not every micro-step, but the major phases
 - Arrow syntax: A --> B or A -->|condition| B
 
-PARTS DIAGRAM: Generate a complete, self-contained SVG schematic showing the physical layout and component relationships for this repair. This is a spatial/structural diagram showing what the parts look like and where they sit relative to each other — NOT a process flowchart.
+PARTS DIAGRAM: Generate a complete, self-contained SVG schematic showing the physical layout and component relationships for this repair. This is a spatial/structural diagram showing what the parts look like and where they sit relative to each other — NOT a process flowchart. If video frames are provided, base the component shapes, positions, and labels on what is actually visible in the frames. If no frames are provided, use your general knowledge of the repair type.
 
 SVG requirements:
 - Root element: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="100%" height="auto">
@@ -204,8 +204,30 @@ export async function generateRepairGuide(
   transcript: string,
   videoTitle: string,
   videoUrl: string,
-  thumbnailUrl: string
+  thumbnailUrl: string,
+  frames: string[] = []
 ): Promise<RepairGuide> {
+  const frameNote = frames.length > 0
+    ? `\n\nVIDEO FRAMES: ${frames.length} frames extracted from the video are provided below as images. Use these to identify actual component shapes, positions, labels, and spatial relationships when generating the parts diagram SVG. The frames are ordered chronologically from ~10% to ~85% of the video duration.`
+    : '';
+
+  // Build content blocks: text first (cached), then images (not cached — unique per video)
+  const userContent: Anthropic.MessageParam['content'] = [
+    {
+      type: 'text',
+      text: `VIDEO TITLE: ${videoTitle}\nVIDEO URL: ${videoUrl}${frameNote}\n\nTRANSCRIPT:\n${transcript}`,
+      cache_control: { type: 'ephemeral' },
+    },
+    ...frames.map((b64): Anthropic.ImageBlockParam => ({
+      type: 'image',
+      source: {
+        type: 'base64',
+        media_type: 'image/jpeg',
+        data: b64,
+      },
+    })),
+  ];
+
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 12000,
@@ -221,13 +243,7 @@ export async function generateRepairGuide(
     messages: [
       {
         role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: `VIDEO TITLE: ${videoTitle}\nVIDEO URL: ${videoUrl}\n\nTRANSCRIPT:\n${transcript}`,
-            cache_control: { type: 'ephemeral' },
-          },
-        ],
+        content: userContent,
       },
     ],
   });
