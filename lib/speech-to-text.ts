@@ -4,7 +4,6 @@ import ffmpeg from 'fluent-ffmpeg';
 import ffmpegStatic from 'ffmpeg-static';
 import fs from 'fs';
 import path from 'path';
-import { Readable } from 'stream';
 import OpenAI from 'openai';
 
 if (ffmpegStatic) {
@@ -28,7 +27,6 @@ export class SpeechToTextError extends Error {
 async function extractAudio(videoUrl: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const tempFile = path.join('/tmp', `audio-${Date.now()}.mp3`);
-    const chunks: Buffer[] = [];
 
     try {
       const stream = ytdl(videoUrl, { quality: 'lowest' });
@@ -76,8 +74,8 @@ export async function transcribeSpeech(videoUrl: string): Promise<{ text: string
       language: 'en',
     });
 
-    // Estimate duration from file (rough approximation: 128kbps)
-    const durationSeconds = Math.round((stats.size / 128000) * 8);
+    // Rough duration estimate: 16kHz mono MP3 ≈ 32kbps → 4000 bytes/sec
+    const durationSeconds = Math.round(stats.size / 4000);
 
     return {
       text: transcript.text,

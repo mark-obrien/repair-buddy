@@ -9,23 +9,30 @@ import { ErrorAlert } from '@/components/ErrorAlert';
 
 type Status = 'idle' | 'loading' | 'success' | 'error';
 
+interface ResultMeta {
+  framesAnalyzed: number;
+  researchPerformed: boolean;
+  provider: string;
+  model: string;
+}
+
 export default function Home() {
   const [status, setStatus] = useState<Status>('idle');
   const [guide, setGuide] = useState<RepairGuide | null>(null);
-  const [framesAnalyzed, setFramesAnalyzed] = useState<number>(0);
+  const [meta, setMeta] = useState<ResultMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(url: string) {
+  async function handleSubmit(url: string, provider: string, model: string) {
     setStatus('loading');
     setError(null);
     setGuide(null);
-    setFramesAnalyzed(0);
+    setMeta(null);
 
     try {
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, provider, model }),
       });
 
       const data = await res.json();
@@ -37,7 +44,12 @@ export default function Home() {
       }
 
       setGuide(data.guide);
-      setFramesAnalyzed(data.framesAnalyzed ?? 0);
+      setMeta({
+        framesAnalyzed: data.framesAnalyzed ?? 0,
+        researchPerformed: data.researchPerformed ?? false,
+        provider: data.provider,
+        model: data.model,
+      });
       setStatus('success');
     } catch {
       setError('Network error. Please check your connection and try again.');
@@ -57,34 +69,38 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+      <main className="max-w-4xl mx-auto px-4 py-8 space-y-4">
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
           <p className="text-sm text-gray-600 mb-4">
-            Paste a YouTube repair video URL to instantly generate a structured guide with parts,
-            tools, torque specs, and step-by-step instructions.
+            Paste a YouTube repair video URL to generate a structured guide with parts, tools, torque specs, and step-by-step instructions.
           </p>
           <UrlInputForm onSubmit={handleSubmit} isLoading={status === 'loading'} />
         </div>
 
         {status === 'loading' && <LoadingState />}
         {status === 'error' && error && <ErrorAlert message={error} />}
-        {status === 'success' && guide && (
+
+        {status === 'success' && guide && meta && (
           <>
-            {framesAnalyzed > 0 ? (
-              <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-                <span>🎬</span>
-                <span>
-                  Parts diagram generated from <strong>{framesAnalyzed} video frames</strong> — layout reflects actual video content.
+            <div className="flex flex-wrap gap-2">
+              {meta.researchPerformed && (
+                <span className="inline-flex items-center gap-1.5 text-xs bg-blue-50 border border-blue-200 text-blue-700 px-3 py-1.5 rounded-full">
+                  🔬 Pre-analysis research performed
                 </span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                <span>⚠️</span>
-                <span>
-                  Video frame extraction was unavailable — parts diagram is based on transcript and general knowledge.
+              )}
+              {meta.framesAnalyzed > 0 ? (
+                <span className="inline-flex items-center gap-1.5 text-xs bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-1.5 rounded-full">
+                  🎬 {meta.framesAnalyzed} video frames analyzed
                 </span>
-              </div>
-            )}
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-xs bg-amber-50 border border-amber-100 text-amber-700 px-3 py-1.5 rounded-full">
+                  ⚠️ Transcript-only (no frames)
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1.5 text-xs bg-gray-100 border border-gray-200 text-gray-600 px-3 py-1.5 rounded-full">
+                🤖 {meta.provider} / {meta.model}
+              </span>
+            </div>
             <GuideResults guide={guide} />
           </>
         )}
@@ -92,21 +108,9 @@ export default function Home() {
         {status === 'idle' && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
             {[
-              {
-                icon: '🎬',
-                title: 'Video Frame Analysis',
-                desc: 'Actual frames extracted and analyzed for accurate part diagrams',
-              },
-              {
-                icon: '⚙️',
-                title: 'Torque Specifications',
-                desc: 'Every torque value mentioned in the video',
-              },
-              {
-                icon: '🔩',
-                title: 'Parts & Tools',
-                desc: 'OEM part numbers, standard and specialty tools',
-              },
+              { icon: '🔬', title: 'Research-First AI', desc: 'Pre-researches the repair topic before watching the video' },
+              { icon: '🎬', title: 'Video Frame Analysis', desc: 'Analyzes actual frames for accurate part diagrams' },
+              { icon: '🤖', title: 'Your Choice of AI', desc: 'Anthropic, OpenAI, or Google — pick your model' },
             ].map((f) => (
               <div key={f.title} className="bg-white rounded-lg border border-gray-200 p-4">
                 <div className="text-3xl mb-2">{f.icon}</div>

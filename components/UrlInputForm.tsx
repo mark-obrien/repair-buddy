@@ -1,14 +1,18 @@
 'use client';
 
 import { useState, FormEvent } from 'react';
+import { ModelSelector } from '@/components/ModelSelector';
+import { DEFAULT_PROVIDER, DEFAULT_MODEL } from '@/lib/providers';
 
 interface Props {
-  onSubmit: (url: string) => void;
+  onSubmit: (url: string, providerId: string, modelId: string) => void;
   isLoading: boolean;
 }
 
 export function UrlInputForm({ onSubmit, isLoading }: Props) {
   const [url, setUrl] = useState('');
+  const [providerId, setProviderId] = useState(DEFAULT_PROVIDER);
+  const [modelId, setModelId] = useState(DEFAULT_MODEL);
   const [validationError, setValidationError] = useState('');
 
   function handleSubmit(e: FormEvent) {
@@ -23,11 +27,16 @@ export function UrlInputForm({ onSubmit, isLoading }: Props) {
       return;
     }
     setValidationError('');
-    onSubmit(trimmed);
+    onSubmit(trimmed, providerId, modelId);
+  }
+
+  function handleModelChange(newProvider: string, newModel: string) {
+    setProviderId(newProvider);
+    setModelId(newModel);
   }
 
   return (
-    <form onSubmit={handleSubmit} className="w-full">
+    <form onSubmit={handleSubmit} className="w-full space-y-3">
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex-1">
           <input
@@ -63,6 +72,13 @@ export function UrlInputForm({ onSubmit, isLoading }: Props) {
           )}
         </button>
       </div>
+
+      <ModelSelector
+        providerId={providerId}
+        modelId={modelId}
+        onChange={handleModelChange}
+        disabled={isLoading}
+      />
     </form>
   );
 }
