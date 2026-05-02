@@ -30,6 +30,7 @@ export interface RepairGuide {
     title: string;
     description: string;
     warnings?: string[];
+    timestampSeconds?: number;
   }>;
   warnings: string[];
   diagram: string;

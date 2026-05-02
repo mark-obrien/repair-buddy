@@ -40,6 +40,7 @@ const repairGuideSchema = z.object({
     title: z.string().describe('Short title for this step (5-10 words)'),
     description: z.string(),
     warnings: z.array(z.string()).optional(),
+    timestampSeconds: z.number().optional().describe('Video timestamp in seconds where this step begins, estimated from the [MM:SS] markers in the transcript'),
   })),
 
   warnings: z.array(z.string()).describe('Global warnings and cautions that apply to the entire job'),
@@ -68,7 +69,7 @@ SPECIALTY TOOLS: Identify non-standard tools. Always note purpose and any DIY al
 
 TORQUE VALUES: Extract every torque specification precisely as stated — never round or estimate. These are safety-critical.
 
-REPAIR STEPS: Extract 8-20 logical, actionable steps covering the full procedure. Include step-specific warnings inline.
+REPAIR STEPS: Extract 8-20 logical, actionable steps covering the full procedure. Include step-specific warnings inline. The transcript contains [MM:SS] timestamp markers — use the nearest preceding marker to estimate the timestampSeconds for each step (convert MM:SS to total seconds).
 
 WARNINGS: Extract all safety warnings, common mistakes, and "gotchas."
 

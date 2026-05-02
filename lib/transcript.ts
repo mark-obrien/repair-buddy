@@ -10,6 +10,27 @@ import { transcribeSpeech, SpeechToTextError } from './speech-to-text';
 
 const MAX_CHARS = 80_000;
 
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function buildTimedTranscript(items: Array<{ text: string; offset: number; duration: number }>): string {
+  // Emit a [MM:SS] marker at the start and then every ~30 seconds
+  const parts: string[] = [];
+  let lastMarkerAt = -30;
+  for (const item of items) {
+    const sec = Math.floor(item.offset / 1000);
+    if (sec - lastMarkerAt >= 30) {
+      parts.push(`[${formatTime(sec)}]`);
+      lastMarkerAt = sec;
+    }
+    parts.push(item.text);
+  }
+  return parts.join(' ');
+}
+
 export interface TranscriptResult {
   text: string;
   durationSeconds: number;
@@ -33,7 +54,7 @@ export async function fetchAndFormatTranscript(videoId: string): Promise<Transcr
       ? Math.ceil((lastItem.offset + lastItem.duration) / 1000)
       : 0;
 
-    const full = items.map((item) => item.text).join(' ');
+    const full = buildTimedTranscript(items);
     const trimmed = full.length > MAX_CHARS
       ? full.slice(0, full.lastIndexOf(' ', MAX_CHARS) || MAX_CHARS)
       : full;

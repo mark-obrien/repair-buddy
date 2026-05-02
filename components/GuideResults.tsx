@@ -79,7 +79,7 @@ export function GuideResults({ guide }: Props) {
           <ToolsTab standardTools={guide.standardTools} specialtyTools={guide.specialtyTools} />
         )}
         {activeTab === 'torque' && <TorqueTab torqueValues={guide.torqueValues} />}
-        {activeTab === 'steps' && <StepsTab steps={guide.repairSteps} />}
+        {activeTab === 'steps' && <StepsTab steps={guide.repairSteps} videoUrl={guide.videoUrl} />}
         {activeTab === 'warnings' && <WarningsTab warnings={guide.warnings} />}
         {activeTab === 'parts-diagram' && <PartsDiagramTab partsDiagram={guide.partsDiagram} />}
         {activeTab === 'diagram' && <DiagramTab diagram={guide.diagram} />}

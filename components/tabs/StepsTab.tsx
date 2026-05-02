@@ -2,9 +2,26 @@ import type { RepairGuide } from '@/lib/types';
 
 interface Props {
   steps: RepairGuide['repairSteps'];
+  videoUrl: string;
 }
 
-export function StepsTab({ steps }: Props) {
+function buildTimestampUrl(videoUrl: string, seconds: number): string {
+  try {
+    const url = new URL(videoUrl);
+    url.searchParams.set('t', String(seconds));
+    return url.toString();
+  } catch {
+    return videoUrl;
+  }
+}
+
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+export function StepsTab({ steps, videoUrl }: Props) {
   if (steps.length === 0) {
     return (
       <div className="text-center py-10 text-gray-400">
@@ -22,7 +39,20 @@ export function StepsTab({ steps }: Props) {
             {step.step}
           </div>
           <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-gray-900 text-sm mb-1">{step.title}</h4>
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <h4 className="font-semibold text-gray-900 text-sm">{step.title}</h4>
+              {step.timestampSeconds != null && (
+                <a
+                  href={buildTimestampUrl(videoUrl, step.timestampSeconds)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 flex items-center gap-1 text-xs text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded px-1.5 py-0.5 transition-colors"
+                  title="Watch this step on YouTube"
+                >
+                  ▶ {formatTime(step.timestampSeconds)}
+                </a>
+              )}
+            </div>
             <p className="text-sm text-gray-600 leading-relaxed">{step.description}</p>
             {step.warnings && step.warnings.length > 0 && (
               <ul className="mt-2 space-y-1">
