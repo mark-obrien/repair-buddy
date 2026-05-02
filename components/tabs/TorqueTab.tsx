@@ -18,7 +18,7 @@ export function TorqueTab({ torqueValues }: Props) {
     <div>
       <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg p-3 mb-4 flex gap-2">
         <span className="shrink-0">⚠️</span>
-        Always verify torque values against your vehicle's service manual. These are extracted from the video and may not cover all applications.
+        Always verify torque values against your vehicle&apos;s service manual. These are extracted from the video and may not cover all applications.
       </p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
