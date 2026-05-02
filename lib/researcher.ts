@@ -34,7 +34,7 @@ export async function researchRepairTopic(
       maxOutputTokens: 1500,
       system: RESEARCH_SYSTEM_PROMPT,
       prompt: `Repair video title: "${videoTitle}"\n\nProvide repair background research for this topic.`,
-      abortSignal: AbortSignal.timeout(20_000),
+      abortSignal: AbortSignal.timeout(60_000),
     });
 
     return result.text;

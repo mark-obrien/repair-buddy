@@ -131,7 +131,7 @@ export async function generateRepairGuide(
         ],
       },
     ],
-    abortSignal: AbortSignal.timeout(55_000),
+    abortSignal: AbortSignal.timeout(180_000),
   });
 
   const toolCall = result.toolCalls[0];
