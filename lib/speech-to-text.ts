@@ -55,14 +55,28 @@ async function extractAudio(videoUrl: string): Promise<string> {
         .toFormat('mp3')
         .audioFrequency(16000)
         .on('error', (err) => {
-          reject(new SpeechToTextError(`Audio extraction failed: ${err.message}`));
+          const msg = err.message ?? '';
+          if (msg.includes('playable formats') || msg.includes('No video formats') || msg.includes('status code: 4')) {
+            reject(new SpeechToTextError(
+              'Could not download audio for this video — it may be age-restricted, region-locked, or require sign-in. Try a video that has captions enabled.'
+            ));
+          } else {
+            reject(new SpeechToTextError(`Audio extraction failed: ${msg}`));
+          }
         })
         .on('end', () => {
           resolve(tempFile);
         })
         .saveToFile(tempFile);
     } catch (err) {
-      reject(new SpeechToTextError(`Could not extract audio: ${err instanceof Error ? err.message : 'unknown error'}`));
+      const msg = err instanceof Error ? err.message : 'unknown error';
+      if (msg.includes('playable formats') || msg.includes('No video formats')) {
+        reject(new SpeechToTextError(
+          'Could not download audio for this video — it may be age-restricted or region-locked. Try a video that has captions enabled.'
+        ));
+      } else {
+        reject(new SpeechToTextError(`Could not extract audio: ${msg}`));
+      }
     }
   });
 }

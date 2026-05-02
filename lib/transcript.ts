@@ -60,9 +60,11 @@ export async function fetchAndFormatTranscript(videoId: string): Promise<Transcr
         result = { text: trimmed, durationSeconds: speechResult.durationSeconds, source: 'speech-to-text' };
         console.log(`✓ Speech-to-text succeeded for ${videoId}`);
       } catch (speechErr) {
-        throw speechErr instanceof SpeechToTextError
-          ? speechErr
-          : new SpeechToTextError('Speech-to-text transcription failed');
+        // Surface speech-to-text errors as unavailable so the UI shows a clear message
+        const detail = speechErr instanceof Error ? speechErr.message : 'unknown';
+        throw new TranscriptUnavailableError(
+          `This video has no captions and automatic transcription failed: ${detail}`
+        );
       }
     } else {
       throw new TranscriptUnavailableError('Could not fetch the transcript for this video.');
