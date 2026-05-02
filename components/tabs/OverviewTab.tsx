@@ -36,6 +36,37 @@ export function OverviewTab({ guide }: Props) {
         </div>
       </div>
 
+      {/* Vehicle / applicability */}
+      {guide.vehicleInfo && (
+        <div className="flex flex-wrap items-start gap-3 p-4 bg-white border border-gray-200 rounded-lg">
+          <span className="text-2xl">🚗</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Applies to</p>
+            <p className="font-semibold text-gray-900">{guide.vehicleInfo.applicability}</p>
+            {/* Structured detail pills */}
+            {!guide.vehicleInfo.isGeneral && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {guide.vehicleInfo.make && (
+                  <span className="text-xs bg-gray-100 text-gray-700 rounded-full px-2 py-0.5">{guide.vehicleInfo.make}</span>
+                )}
+                {guide.vehicleInfo.model && (
+                  <span className="text-xs bg-gray-100 text-gray-700 rounded-full px-2 py-0.5">{guide.vehicleInfo.model}</span>
+                )}
+                {guide.vehicleInfo.yearRange && (
+                  <span className="text-xs bg-orange-100 text-orange-700 rounded-full px-2 py-0.5">{guide.vehicleInfo.yearRange}</span>
+                )}
+                {guide.vehicleInfo.trim && (
+                  <span className="text-xs bg-gray-100 text-gray-700 rounded-full px-2 py-0.5">{guide.vehicleInfo.trim}</span>
+                )}
+              </div>
+            )}
+            {guide.vehicleInfo.notes && (
+              <p className="text-xs text-gray-500 mt-1.5">{guide.vehicleInfo.notes}</p>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="bg-orange-50 border border-orange-100 rounded-lg p-4">
         <h3 className="font-semibold text-gray-800 mb-2 text-sm uppercase tracking-wide">Summary</h3>
         <p className="text-gray-700 leading-relaxed">{guide.summary}</p>

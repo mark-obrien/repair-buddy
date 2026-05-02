@@ -7,6 +7,16 @@ import type { RepairGuide } from './types';
 // Zod schema — single source of truth for the structured output
 // ---------------------------------------------------------------------------
 const repairGuideSchema = z.object({
+  vehicleInfo: z.object({
+    applicability: z.string().describe('Human-readable summary: e.g. "2018-2022 Toyota Camry" or "Universal / most vehicles"'),
+    make: z.string().optional(),
+    model: z.string().optional(),
+    yearRange: z.string().optional().describe('e.g. "2018-2022" or "2020"'),
+    trim: z.string().optional().describe('e.g. "All trims" or "LE, SE, XSE"'),
+    notes: z.string().optional().describe('Additional compatibility info, e.g. platform mates or model variants'),
+    isGeneral: z.boolean().describe('true when no specific vehicle/appliance is identified'),
+  }),
+
   summary: z.string().describe('2-4 sentence summary of what repair is covered and the overall approach'),
 
   partsNeeded: z.array(z.object({
@@ -60,6 +70,8 @@ const repairGuideSchema = z.object({
 const SYSTEM_PROMPT = `You are an expert automotive and appliance repair technician with 20+ years of experience. You specialize in analyzing repair video transcripts and extracting precise, actionable information for DIY repair guides.
 
 When research context is provided, use it as authoritative background knowledge. Cross-reference it against the video transcript and frames to produce the most accurate and complete guide possible. If the video contradicts the research on a factual point (e.g. a torque spec), prefer the video's explicit value but note the discrepancy.
+
+VEHICLE INFO: Identify the specific vehicle, appliance, or equipment this repair applies to. Extract make, model, year or year range, and trim if mentioned. If the video covers multiple compatible vehicles note them in the notes field. If no specific vehicle is identified, set isGeneral=true and applicability to "Universal / General repair".
 
 PARTS: Extract every part mentioned — OEM part numbers, aftermarket options, quantities, and brand recommendations. Only include part numbers if explicitly stated verbally.
 
