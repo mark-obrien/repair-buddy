@@ -49,7 +49,7 @@ const repairGuideSchema = z.object({
   ),
 
   partsDiagram: z.string().describe(
-    'Complete self-contained SVG showing physical component layout. Root: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="100%" height="auto">. No script tags or event handlers. Color-coded by component type with legend.'
+    'Complete self-contained SVG schematic. Root: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">. White background rect first. Title at top. Components in center region. Legend box bottom-right. No scripts, no external refs.'
   ),
 });
 
@@ -74,7 +74,29 @@ WARNINGS: Extract all safety warnings, common mistakes, and "gotchas."
 
 PROCESS DIAGRAM: Valid Mermaid flowchart TD showing the repair workflow. 8-15 steps. Short alphanumeric labels only.
 
-PARTS DIAGRAM: A complete self-contained SVG schematic showing physical component layout. If video frames are provided, base shapes and positions on what is actually visible. Color coding: primary part=#fed7aa/stroke #f97316, structural=#e2e8f0/stroke #94a3b8, fasteners=#fef9c3/stroke #ca8a04, seals/gaskets=#dcfce7/stroke #16a34a, sensors=#dbeafe/stroke #2563eb, rotating=#f3e8ff/stroke #9333ea, fluid=#cffafe/stroke #0891b2. Label every component in 12px system-ui. Include a legend. 8-16 components. NO script tags or event handlers.
+PARTS DIAGRAM: A clean, detailed SVG schematic (viewBox 0 0 800 600) of the physical component layout.
+
+REQUIRED STRUCTURE:
+1. White background: <rect width="800" height="600" fill="white"/>
+2. Title: centered bold text at y=30, font-size 18, describing the specific repair
+3. Components drawn in center region (x: 60–720, y: 50–490)
+4. Legend box anchored at bottom-right (x≈540, y≈495, width≈245, height auto)
+
+COMPONENTS (8–14 parts):
+- Draw each as a meaningful shape (rect, circle, ellipse, path) — not just generic boxes
+- Fill/stroke by type: primary=#fed7aa/#f97316, structural=#e2e8f0/#94a3b8, fasteners=#fef9c3/#ca8a04, seals=#dcfce7/#16a34a, sensors=#dbeafe/#2563eb, rotating=#f3e8ff/#9333ea, fluid=#cffafe/#0891b2
+- Bold component name label (font-size 12, font-weight bold, font-family system-ui) placed OUTSIDE the shape with a dashed leader line (<line stroke-dasharray="4 2" stroke="#999"/>)
+- If video frames were provided, reflect actual shapes and positions visible in the frames
+
+LEGEND (bottom-right box):
+- Thin border rect, light gray background (#f9fafb)
+- "Legend" heading, then one row per color used: colored swatch rect (14×14) + label
+
+QUALITY RULES:
+- No overlapping labels
+- Minimum 20px gap between component shapes
+- All text within viewBox bounds (x: 5–795, y: 12–595)
+- NO script tags, NO event handlers, NO external hrefs
 
 IMPORTANT RULES:
 - Never invent part numbers, torque values, or steps not found in the transcript/frames/research
