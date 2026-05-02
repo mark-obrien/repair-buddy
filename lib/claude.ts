@@ -32,6 +32,44 @@ PROCESS DIAGRAM: Generate a syntactically valid Mermaid flowchart that shows the
 - Represent 8 to 15 key steps — not every micro-step, but the major phases
 - Arrow syntax: A --> B or A -->|condition| B
 
+PARTS DIAGRAM: Generate a complete, self-contained SVG schematic showing the physical layout and component relationships for this repair. This is a spatial/structural diagram showing what the parts look like and where they sit relative to each other — NOT a process flowchart.
+
+SVG requirements:
+- Root element: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="100%" height="auto">
+- Do NOT include <?xml?> declarations, DOCTYPE, or <html> wrappers
+- Do NOT use <script> tags, on* event attributes, or javascript: URIs
+- Do NOT reference external resources (no xlink:href to URLs, no @import)
+- All styles must be inline or in an embedded <style> block within the SVG
+- Include a white/light background rect covering the full viewBox: <rect width="800" height="600" fill="#f8fafc"/>
+- Add a centered title at the top (y=30) in bold 16px showing the repair type (e.g. "Timing Belt — Component Layout")
+
+COMPONENT LAYOUT:
+- Arrange 8 to 16 labeled components in their approximate physical/spatial relationship
+- Use simple geometric shapes: rect for flat/rectangular parts, ellipse/circle for round parts, polygon for brackets
+- Draw thin connector lines (stroke="#94a3b8", stroke-width="1", stroke-dasharray="4 2") between mechanically related components
+- Leave adequate whitespace between components so labels are readable
+
+COLOR CODING (use consistently):
+- Primary part being replaced: fill="#fed7aa" stroke="#f97316" (orange)
+- Structural/housing parts (engine block, valve cover, housing): fill="#e2e8f0" stroke="#94a3b8" (slate)
+- Fasteners (bolts, nuts, studs): fill="#fef9c3" stroke="#ca8a04" (yellow)
+- Seals, gaskets, o-rings: fill="#dcfce7" stroke="#16a34a" (green)
+- Sensors and electrical: fill="#dbeafe" stroke="#2563eb" (blue)
+- Rotating parts (pulleys, gears): fill="#f3e8ff" stroke="#9333ea" (purple)
+- Fluid parts (pumps, hoses): fill="#cffafe" stroke="#0891b2" (cyan)
+
+LABELS:
+- Every component must have a text label in font-family: system-ui, sans-serif; font-size: 12px; fill: #1e293b
+- Place labels outside the component shape with a short leader line where space is tight
+- Add a white backing rect behind each label for readability
+- Where torque specs apply, add a small annotation badge: <rect fill="#fef3c7" stroke="#f59e0b"/> with the torque value (e.g. "47 Nm")
+
+LEGEND:
+- Include a legend box in the bottom-right corner (x=570, y=410, width=220, height=175)
+- Legend background: <rect fill="white" stroke="#e2e8f0"/>
+- "Component Legend" as bold 12px title inside the legend
+- Show each color category present in the diagram as a 12x12 colored rect with a text label
+
 IMPORTANT RULES:
 - If information is not explicitly mentioned in the transcript, return an empty array — do NOT invent, infer, or fabricate data
 - Return empty arrays for any field with no data — never return null
@@ -140,6 +178,11 @@ const REPAIR_GUIDE_TOOL: Anthropic.Tool = {
         description:
           "Valid Mermaid flowchart TD syntax showing the repair process. Must start with 'flowchart TD' on the first line. Use short labels (max 30 chars). Only alphanumeric, spaces, hyphens in labels.",
       },
+      partsDiagram: {
+        type: 'string',
+        description:
+          'A complete self-contained SVG string showing the physical layout and component relationships. Root element must be <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="100%" height="auto">. NO script tags, NO on* event attributes, NO external href references. Color coding: primary part=fill #fed7aa stroke #f97316, structural=fill #e2e8f0 stroke #94a3b8, fasteners=fill #fef9c3 stroke #ca8a04, seals/gaskets=fill #dcfce7 stroke #16a34a, sensors=fill #dbeafe stroke #2563eb, rotating=fill #f3e8ff stroke #9333ea, fluid=fill #cffafe stroke #0891b2. Every component labeled in 12px system-ui. Legend box in bottom-right. 8-16 labeled components. This is a PHYSICAL LAYOUT diagram, not a flowchart.',
+      },
     },
     required: [
       'summary',
@@ -150,6 +193,7 @@ const REPAIR_GUIDE_TOOL: Anthropic.Tool = {
       'repairSteps',
       'warnings',
       'diagram',
+      'partsDiagram',
     ],
   },
 };
@@ -164,7 +208,7 @@ export async function generateRepairGuide(
 ): Promise<RepairGuide> {
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 8192,
+    max_tokens: 12000,
     system: [
       {
         type: 'text',

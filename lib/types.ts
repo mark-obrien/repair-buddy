@@ -33,6 +33,7 @@ export interface RepairGuide {
   }>;
   warnings: string[];
   diagram: string;
+  partsDiagram?: string;
 }
 
 export interface AnalyzeRequest {

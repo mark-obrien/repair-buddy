@@ -9,12 +9,13 @@ import { TorqueTab } from '@/components/tabs/TorqueTab';
 import { StepsTab } from '@/components/tabs/StepsTab';
 import { WarningsTab } from '@/components/tabs/WarningsTab';
 import { DiagramTab } from '@/components/tabs/DiagramTab';
+import { PartsDiagramTab } from '@/components/tabs/PartsDiagramTab';
 
 interface Props {
   guide: RepairGuide;
 }
 
-type TabId = 'overview' | 'parts' | 'tools' | 'torque' | 'steps' | 'warnings' | 'diagram';
+type TabId = 'overview' | 'parts' | 'tools' | 'torque' | 'steps' | 'warnings' | 'diagram' | 'parts-diagram';
 
 export function GuideResults({ guide }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('overview');
@@ -28,7 +29,8 @@ export function GuideResults({ guide }: Props) {
     { id: 'torque', label: 'Torque', count: guide.torqueValues.length },
     { id: 'steps', label: 'Steps', count: guide.repairSteps.length },
     { id: 'warnings', label: 'Warnings', count: guide.warnings.length },
-    { id: 'diagram', label: 'Diagram' },
+    { id: 'parts-diagram', label: 'Parts Diagram' },
+    { id: 'diagram', label: 'Process Flow' },
   ];
 
   return (
@@ -79,6 +81,7 @@ export function GuideResults({ guide }: Props) {
         {activeTab === 'torque' && <TorqueTab torqueValues={guide.torqueValues} />}
         {activeTab === 'steps' && <StepsTab steps={guide.repairSteps} />}
         {activeTab === 'warnings' && <WarningsTab warnings={guide.warnings} />}
+        {activeTab === 'parts-diagram' && <PartsDiagramTab partsDiagram={guide.partsDiagram} />}
         {activeTab === 'diagram' && <DiagramTab diagram={guide.diagram} />}
       </div>
     </div>
