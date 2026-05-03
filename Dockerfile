@@ -20,17 +20,18 @@ RUN apk add --no-cache ffmpeg && \
     addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-ENV FFMPEG_PATH=/usr/bin/ffmpeg
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-RUN mkdir -p /app/.next/cache && chown -R nextjs:nodejs /app/.next/cache
-
-COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/next.config.mjs ./next.config.mjs
+# Pre-create .next/cache so the runtime can write to it. Even with image
+# optimization disabled, Next creates cache subdirectories at runtime
+# (fetch cache, etc.) — without this, the nextjs user gets EACCES on
+# /app/.next/cache because /app itself is owned by root.
+RUN mkdir -p /app/.next/cache && chown -R nextjs:nodejs /app/.next
 
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-CMD ["npm", "start"]
+CMD ["node", "server.js"]
