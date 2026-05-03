@@ -11,13 +11,14 @@ import { WarningsTab } from '@/components/tabs/WarningsTab';
 import { DiagramTab } from '@/components/tabs/DiagramTab';
 import { PartsDiagramTab } from '@/components/tabs/PartsDiagramTab';
 import { ShoppingTab } from '@/components/tabs/ShoppingTab';
+import { VideoGuideView } from '@/components/VideoGuideView';
 
 interface Props {
   guide: RepairGuide;
   frames?: string[];
 }
 
-type TabId = 'overview' | 'parts' | 'tools' | 'torque' | 'steps' | 'warnings' | 'diagram' | 'parts-diagram' | 'shopping';
+type TabId = 'watch' | 'overview' | 'parts' | 'tools' | 'torque' | 'steps' | 'warnings' | 'diagram' | 'parts-diagram' | 'shopping';
 
 export function GuideResults({ guide, frames = [] }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('overview');
@@ -25,6 +26,7 @@ export function GuideResults({ guide, frames = [] }: Props) {
   const toolCount = guide.standardTools.length + guide.specialtyTools.length;
 
   const tabs: Array<{ id: TabId; label: string; count?: number }> = [
+    { id: 'watch', label: '▶ Watch' },
     { id: 'overview', label: 'Overview' },
     { id: 'parts', label: 'Parts', count: guide.partsNeeded.length },
     { id: 'tools', label: 'Tools', count: toolCount },
@@ -75,6 +77,12 @@ export function GuideResults({ guide, frames = [] }: Props) {
         </nav>
       </div>
 
+      {/* Watch tab renders edge-to-edge without the p-5 wrapper */}
+      {activeTab === 'watch' && (
+        <VideoGuideView guide={guide} frames={frames} />
+      )}
+
+      {activeTab !== 'watch' && (
       <div className="p-5">
         {/* Screen view: only the active tab */}
         <div className="screen-view">
@@ -123,6 +131,7 @@ export function GuideResults({ guide, frames = [] }: Props) {
           </section>
         </div>
       </div>
+      )}
     </div>
   );
 }
