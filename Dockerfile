@@ -20,7 +20,8 @@ RUN apk add --no-cache ffmpeg && \
     addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/public ./public
+# No /app/public copy — the project doesn't ship any static assets.
+# (Re-add `COPY --from=builder /app/public ./public` if you ever add files there.)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
