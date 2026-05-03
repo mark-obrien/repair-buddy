@@ -1,9 +1,13 @@
 import ytdl from '@distube/ytdl-core';
 import ffmpeg from 'fluent-ffmpeg';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { mkdtemp, readFile, unlink, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import type { Readable } from 'stream';
+
+const execFileAsync = promisify(execFile);
 
 export class FrameExtractionError extends Error {
   constructor(message: string) {
@@ -28,7 +32,6 @@ export interface FrameExtractionResult {
 
 function getFrameTimestamps(durationSeconds: number, count: number): number[] {
   if (durationSeconds <= 0) return [];
-  // Skip first 10% (intros) and last 15% (outros). Even spacing inside.
   const startSeconds = Math.max(5, durationSeconds * 0.1);
   const endSeconds = durationSeconds * 0.85;
   const usableDuration = endSeconds - startSeconds;
@@ -42,6 +45,57 @@ function getFrameTimestamps(durationSeconds: number, count: number): number[] {
   return timestamps;
 }
 
+// ---------------------------------------------------------------------------
+// yt-dlp: get a direct video stream URL (preferred)
+// ---------------------------------------------------------------------------
+
+async function getVideoUrlWithYtDlp(videoUrl: string): Promise<string> {
+  const ytdlpBin = process.env.YTDLP_PATH ?? 'yt-dlp';
+  const args = [
+    '-f', 'bestvideo[height<=480][ext=mp4]/bestvideo[height<=480]/bestvideo/best[height<=480]/best',
+    '--get-url',
+    '--no-playlist',
+    videoUrl,
+  ];
+
+  const { stdout } = await execFileAsync(ytdlpBin, args, { timeout: 30_000 });
+  const url = stdout.trim().split('\n')[0];
+  if (!url) throw new FrameExtractionError('yt-dlp returned no stream URL');
+  return url;
+}
+
+// ---------------------------------------------------------------------------
+// ytdl-core: get a direct video stream URL (fallback)
+// ---------------------------------------------------------------------------
+
+async function getVideoUrlWithYtdlCore(videoUrl: string): Promise<string> {
+  const info = await ytdl.getInfo(videoUrl);
+  const format = ytdl.chooseFormat(info.formats, { quality: 'lowestvideo' });
+  if (!format?.url) throw new FrameExtractionError('No usable video stream found.');
+  return format.url;
+}
+
+// ---------------------------------------------------------------------------
+// Unified URL fetch: yt-dlp first, ytdl-core if yt-dlp is absent
+// ---------------------------------------------------------------------------
+
+async function getVideoStreamUrl(videoUrl: string): Promise<string> {
+  try {
+    return await getVideoUrlWithYtDlp(videoUrl);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : '';
+    if (msg.includes('ENOENT') || msg.toLowerCase().includes('not found')) {
+      console.warn('yt-dlp not found, falling back to ytdl-core for frame extraction');
+      return getVideoUrlWithYtdlCore(videoUrl);
+    }
+    throw err;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Public entry point
+// ---------------------------------------------------------------------------
+
 export async function extractVideoFrames(
   videoUrl: string,
   durationSeconds: number
@@ -54,22 +108,19 @@ export async function extractVideoFrames(
   const tempDir = await mkdtemp(join(tmpdir(), 'repairbuddy-frames-'));
 
   try {
-    // Get a video stream URL via ytdl-core
-    const info = await ytdl.getInfo(videoUrl);
-    // Pick the lowest-quality video format with at least video — we don't need 4K to extract frames
-    const format = ytdl.chooseFormat(info.formats, { quality: 'lowestvideo' });
-    if (!format?.url) {
-      throw new FrameExtractionError('No usable video stream found.');
-    }
-
-    const framePromises = timestamps.map((seconds, i) => extractSingleFrame(format.url, seconds, tempDir, i));
+    const streamUrl = await getVideoStreamUrl(videoUrl);
+    const framePromises = timestamps.map((seconds, i) =>
+      extractSingleFrame(streamUrl, seconds, tempDir, i)
+    );
     const frames = await Promise.all(framePromises);
     const validFrames = frames.filter((f): f is string => f !== null);
 
     return { frames: validFrames, count: validFrames.length };
   } catch (err) {
     if (err instanceof FrameExtractionError) throw err;
-    throw new FrameExtractionError(err instanceof Error ? err.message : 'Frame extraction failed.');
+    throw new FrameExtractionError(
+      err instanceof Error ? err.message : 'Frame extraction failed.'
+    );
   } finally {
     try { await rm(tempDir, { recursive: true, force: true }); } catch { /* ignore */ }
   }
@@ -98,8 +149,7 @@ async function extractSingleFrame(
           const buffer = await readFile(framePath);
           await unlink(framePath).catch(() => {});
           resolve(buffer.toString('base64'));
-        } catch (err) {
-          console.warn(`Frame ${index} read failed:`, err);
+        } catch {
           resolve(null);
         }
       })
@@ -107,5 +157,5 @@ async function extractSingleFrame(
   });
 }
 
-// Type guard for Readable streams (unused here but kept for future stream-based extraction)
+// Type guard kept for potential stream-based extraction
 export type _StreamGuard = Readable;
