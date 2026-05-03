@@ -4,17 +4,33 @@ Paste a YouTube repair video URL and get an AI-generated companion guide — par
 
 ## Features
 
+### Guide generation
 - Structured repair guides from YouTube video transcripts
 - Parts list with part numbers, quantities, and notes
 - Standard and specialty tools with sizes and DIY alternatives
 - Torque specifications extracted verbatim (safety-critical)
 - Numbered repair steps with inline warnings
+- **Difficulty rating** (beginner / intermediate / advanced / expert) with reasoning
+- **Estimated time** in minutes
+- **Frame-grounded steps** — each step shows the most representative video frame inline
 - Mermaid process flowchart
 - SVG parts diagram with labeled components
-- Video frame extraction for more accurate diagrams
 - Whisper speech-to-text fallback for videos without captions
 - Multi-provider AI: Anthropic, OpenAI, Google
-- Transcript caching (in-memory + optional Redis)
+
+### Context enrichment
+- **Pre-research phase** — a fast/cheap model researches the repair topic before video analysis
+- **Video frame analysis** — 8 frames extracted and fed to vision models for accurate diagrams
+- **Comments mining** (optional) — top viewer comments fed into the guide for corrections and gotchas
+
+### User-facing
+- **Save & share** — every guide is cached for 7 days; one-click share links
+- **My Garage** — save your vehicles in your browser; instant applicability check on every guide
+- **Shopping links** — search RockAuto, Amazon, AutoZone, O'Reilly, eBay Motors for any part
+- **Torque unit toggle** — display values in ft-lbs / Nm / in-lbs / kg-m on demand
+- **Print / Save as PDF** — full-guide print stylesheet, all tabs in one document
+- **Regenerate** — bypass the cache and rebuild the guide from scratch
+- Transcript and full-guide caching (in-memory + optional Redis)
 
 ---
 
@@ -45,7 +61,8 @@ cp .env.example .env.local
 | `ANTHROPIC_API_KEY` | One of these three | Claude models |
 | `OPENAI_API_KEY` | One of these three | GPT-4o models + Whisper transcription |
 | `GOOGLE_GENERATIVE_AI_API_KEY` | One of these three | Gemini models |
-| `REDIS_URL` | No | Transcript cache (e.g. `redis://localhost:6379`) |
+| `REDIS_URL` | No | Transcript + guide cache (e.g. `redis://localhost:6379`) |
+| `YOUTUBE_API_KEY` | No | Enables top-comments mining for additional context |
 | `FFMPEG_PATH` | No | Override ffmpeg binary path (default: auto-detected) |
 
 ### Run
@@ -60,57 +77,22 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Production (Docker)
 
-The Docker setup uses system ffmpeg so frame extraction and speech-to-text work reliably without any binary path issues. Redis is included for transcript caching.
-
-### Prerequisites
-
-- Docker and Docker Compose
-- API key(s) for at least one AI provider
-
-### Setup
-
 ```bash
 cp .env.example .env.local
 # Edit .env.local with your API keys
-```
-
-### Run
-
-```bash
 docker compose up --build
 ```
 
 Open [http://localhost:6788](http://localhost:6788).
 
-To run in the background:
-
-```bash
-docker compose up --build -d
-docker compose logs -f   # tail logs
-docker compose down      # stop
-```
-
-### Environment variables in production
-
-Pass keys via `.env.local` (Docker Compose reads it automatically) or export them in your shell before running `docker compose up`:
-
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-export OPENAI_API_KEY=sk-...
-docker compose up --build -d
-```
-
-### Updating
-
-```bash
-git pull
-docker compose up --build -d
-```
-
 ---
 
 ## Notes
 
-- **Videos without captions**: the app falls back to OpenAI Whisper (requires `OPENAI_API_KEY`). On environments without ffmpeg this fallback is unavailable — the video must have YouTube captions.
-- **Frame extraction**: requires ffmpeg. Skipped silently if unavailable — the guide still generates from the transcript alone.
-- **Model selection**: each request can specify provider and model via the UI. The research pre-pass always uses the cheapest model in the selected provider family.
+- **Videos without captions** fall back to OpenAI Whisper (requires `OPENAI_API_KEY`).
+- **Frame extraction** requires ffmpeg. Skipped silently if unavailable.
+- **My Garage** is browser-only — vehicles are stored in `localStorage`. No accounts, no servers.
+- **Shopping links** are plain search URLs — Repair Buddy is not paid for clicks. The structure makes it easy to add affiliate tags via env vars later.
+- **Comments mining** is optional and degrades gracefully — guide generation still works without `YOUTUBE_API_KEY`.
+- **Cache lifetime**: transcripts 24h, full guides 7 days. Generating the same video again with the same model serves instantly from cache.
+- **Share links** look like `/g/{videoId}?p={provider}&m={model}` and survive for 7 days (the cache TTL).

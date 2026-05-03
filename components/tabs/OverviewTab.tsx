@@ -1,8 +1,24 @@
 import Image from 'next/image';
-import type { RepairGuide } from '@/lib/types';
+import type { RepairGuide, Difficulty } from '@/lib/types';
+import { GarageMatchBanner } from '@/components/GarageMatchBanner';
 
 interface Props {
   guide: RepairGuide;
+}
+
+const DIFFICULTY_STYLES: Record<Difficulty, { bg: string; text: string; border: string; icon: string; label: string }> = {
+  beginner:     { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', icon: '🌱', label: 'Beginner' },
+  intermediate: { bg: 'bg-blue-50',    border: 'border-blue-200',    text: 'text-blue-700',    icon: '🔧', label: 'Intermediate' },
+  advanced:     { bg: 'bg-amber-50',   border: 'border-amber-200',   text: 'text-amber-700',   icon: '⚙️', label: 'Advanced' },
+  expert:       { bg: 'bg-rose-50',    border: 'border-rose-200',    text: 'text-rose-700',    icon: '🏆', label: 'Expert' },
+};
+
+function formatDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
 }
 
 export function OverviewTab({ guide }: Props) {
@@ -26,7 +42,7 @@ export function OverviewTab({ guide }: Props) {
             href={guide.videoUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-sm text-orange-600 hover:text-orange-700 font-medium"
+            className="inline-flex items-center gap-1.5 text-sm text-orange-600 hover:text-orange-700 font-medium print:hidden"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
               <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.73a8.22 8.22 0 004.83 1.56V6.83a4.85 4.85 0 01-1.06-.14z"/>
@@ -36,6 +52,41 @@ export function OverviewTab({ guide }: Props) {
         </div>
       </div>
 
+      {/* Garage match banner — only renders if user has saved vehicles */}
+      <GarageMatchBanner vehicleInfo={guide.vehicleInfo} />
+
+      {/* Difficulty + time */}
+      {(guide.difficulty || guide.estimatedTimeMinutes) && (
+        <div className="flex flex-wrap gap-3">
+          {guide.difficulty && (() => {
+            const style = DIFFICULTY_STYLES[guide.difficulty];
+            return (
+              <div className={`flex items-start gap-3 p-3 rounded-lg border ${style.bg} ${style.border} flex-1 min-w-[200px]`}>
+                <span className="text-2xl">{style.icon}</span>
+                <div className="min-w-0">
+                  <p className={`text-xs font-semibold uppercase tracking-wide ${style.text}`}>Difficulty</p>
+                  <p className={`font-semibold ${style.text}`}>{style.label}</p>
+                  {guide.difficultyReason && (
+                    <p className="text-xs text-gray-600 mt-0.5">{guide.difficultyReason}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {guide.estimatedTimeMinutes != null && (
+            <div className="flex items-start gap-3 p-3 rounded-lg border bg-gray-50 border-gray-200 flex-1 min-w-[200px]">
+              <span className="text-2xl">⏱</span>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Estimated time</p>
+                <p className="font-semibold text-gray-900">{formatDuration(guide.estimatedTimeMinutes)}</p>
+                <p className="text-xs text-gray-500 mt-0.5">For an attentive DIYer</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Vehicle / applicability */}
       {guide.vehicleInfo && (
         <div className="flex flex-wrap items-start gap-3 p-4 bg-white border border-gray-200 rounded-lg">
@@ -43,7 +94,6 @@ export function OverviewTab({ guide }: Props) {
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Applies to</p>
             <p className="font-semibold text-gray-900">{guide.vehicleInfo.applicability}</p>
-            {/* Structured detail pills */}
             {!guide.vehicleInfo.isGeneral && (
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {guide.vehicleInfo.make && (

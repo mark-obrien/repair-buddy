@@ -8,12 +8,19 @@ export interface VehicleInfo {
   isGeneral: boolean;      // true when no specific vehicle is identified
 }
 
+export type Difficulty = 'beginner' | 'intermediate' | 'advanced' | 'expert';
+
 export interface RepairGuide {
   videoTitle: string;
   videoUrl: string;
   thumbnailUrl: string;
   vehicleInfo: VehicleInfo;
   summary: string;
+
+  difficulty?: Difficulty;
+  difficultyReason?: string;
+  estimatedTimeMinutes?: number;
+
   partsNeeded: Array<{
     name: string;
     partNumber?: string;
@@ -42,6 +49,7 @@ export interface RepairGuide {
     description: string;
     warnings?: string[];
     timestampSeconds?: number;
+    frameIndex?: number;       // index into the frames[] array for inline display
   }>;
   warnings: string[];
   diagram: string;
@@ -56,4 +64,19 @@ export interface AnalyzeResponse {
   guide?: RepairGuide;
   error?: string;
   framesAnalyzed?: number;
+  frames?: string[];   // base64 JPEG strings, returned so the UI can render frame-grounded steps
+}
+
+// ---------------------------------------------------------------------------
+// My Garage (client-side localStorage)
+// ---------------------------------------------------------------------------
+export interface SavedVehicle {
+  id: string;          // uuid
+  nickname?: string;   // "My daily driver"
+  make: string;
+  model: string;
+  year: number;
+  trim?: string;
+  notes?: string;
+  addedAt: number;     // unix ms
 }

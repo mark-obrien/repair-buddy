@@ -5,9 +5,11 @@ import { useEffect, useState } from 'react';
 const MESSAGES = [
   'Fetching video transcript…',
   'Extracting video frames…',
+  'Reading viewer comments…',
   'Analyzing video frames…',
   'Identifying parts and tools…',
   'Extracting torque specifications…',
+  'Estimating difficulty and time…',
   'Generating parts diagram from frames…',
   'Building process flow…',
   'Almost done…',

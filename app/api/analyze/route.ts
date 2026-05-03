@@ -9,7 +9,9 @@ import {
 import { extractVideoFrames, FrameExtractionError } from '@/lib/frames';
 import { generateRepairGuide } from '@/lib/guide-generator';
 import { researchRepairTopic } from '@/lib/researcher';
+import { fetchTopComments } from '@/lib/comments';
 import { checkProviderKey, DEFAULT_PROVIDER, DEFAULT_MODEL, getModelOption } from '@/lib/providers';
+import { getCachedGuide, cacheGuide } from '@/lib/cache';
 
 export const maxDuration = 60;
 export const runtime = 'nodejs';
@@ -34,20 +36,19 @@ async function tryExtractFrames(videoUrl: string, durationSeconds: number): Prom
 }
 
 export async function POST(request: Request) {
-  let body: { url?: string; provider?: string; model?: string };
+  let body: { url?: string; provider?: string; model?: string; force?: boolean };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 });
   }
 
-  const { url, provider = DEFAULT_PROVIDER, model = DEFAULT_MODEL } = body;
+  const { url, provider = DEFAULT_PROVIDER, model = DEFAULT_MODEL, force = false } = body;
 
   if (!url?.trim()) {
     return NextResponse.json({ error: 'A YouTube URL is required.' }, { status: 400 });
   }
 
-  // Validate provider key is configured
   const keyError = checkProviderKey(provider);
   if (keyError) {
     return NextResponse.json({ error: keyError }, { status: 400 });
@@ -61,7 +62,25 @@ export async function POST(request: Request) {
     );
   }
 
-  // Fetch metadata and transcript
+  // Cache hit — short-circuit
+  if (!force) {
+    const cached = await getCachedGuide(videoId, provider, model);
+    if (cached) {
+      return NextResponse.json({
+        guide: cached.guide,
+        framesAnalyzed: cached.framesAnalyzed,
+        researchPerformed: cached.researchPerformed,
+        commentsAnalyzed: cached.commentsAnalyzed ?? 0,
+        provider: cached.provider,
+        model: cached.model,
+        frames: cached.frames ?? [],
+        fromCache: true,
+        cachedAt: cached.cachedAt,
+      });
+    }
+  }
+
+  // Metadata + transcript
   let metadata: { title: string; thumbnailUrl: string };
   let transcriptText: string;
   let durationSeconds: number;
@@ -85,19 +104,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to fetch video data. Please try again.' }, { status: 500 });
   }
 
-  // Determine if selected model supports vision
   const modelOption = getModelOption(provider, model);
   const useFrames = modelOption?.supportsVision !== false;
 
-  // Run research + frame extraction in parallel (both non-fatal)
-  const [researchContext, frames] = await Promise.all([
+  // Three non-fatal parallel calls: research, frames, comments. Any can fail
+  // silently and the guide still generates — they only enhance quality.
+  const [researchContext, frames, commentsContext] = await Promise.all([
     researchRepairTopic(metadata.title, provider, model),
     useFrames ? tryExtractFrames(url.trim(), durationSeconds) : Promise.resolve([]),
+    fetchTopComments(videoId),
   ]);
 
-  if (researchContext) {
-    console.log(`Research context generated (${researchContext.length} chars)`);
-  }
+  if (researchContext) console.log(`Research context: ${researchContext.length} chars`);
+  if (commentsContext) console.log(`Comments context: ${commentsContext.split('\n').length} comments`);
+
+  const commentsAnalyzed = commentsContext ? commentsContext.split('\n').filter(Boolean).length : 0;
 
   try {
     const guide = await generateRepairGuide(
@@ -107,16 +128,26 @@ export async function POST(request: Request) {
       metadata.thumbnailUrl,
       frames,
       researchContext,
+      commentsContext,
       provider,
       model
     );
-    return NextResponse.json({
+
+    const responsePayload = {
       guide,
       framesAnalyzed: frames.length,
       researchPerformed: researchContext.length > 0,
+      commentsAnalyzed,
       provider,
       model,
-    });
+    };
+
+    // Fire-and-forget cache write — frames are stored too so shared views work
+    cacheGuide(videoId, provider, model, { ...responsePayload, frames }).catch((err) =>
+      console.warn('Guide cache write failed:', err)
+    );
+
+    return NextResponse.json({ ...responsePayload, frames, fromCache: false });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'unknown';
     console.error('Guide generation error:', msg);

@@ -24,14 +24,13 @@ export async function researchRepairTopic(
   providerId: string,
   modelId: string
 ): Promise<string> {
-  // Use a fast/cheap model for research when possible
   const researchModelId = getResearchModel(providerId, modelId);
   const model = getModel(providerId, researchModelId);
 
   try {
     const result = await generateText({
       model,
-      maxOutputTokens: 1500,
+      maxTokens: 1500,
       system: RESEARCH_SYSTEM_PROMPT,
       prompt: `Repair video title: "${videoTitle}"\n\nProvide repair background research for this topic.`,
       abortSignal: undefined,
@@ -39,19 +38,16 @@ export async function researchRepairTopic(
 
     return result.text;
   } catch (err) {
-    // Research is non-critical — log and return empty string to continue without it
     console.warn('Research phase failed:', err instanceof Error ? err.message : err);
     return '';
   }
 }
 
-// Use the cheapest/fastest model within the same provider for the research phase
 function getResearchModel(providerId: string, selectedModelId: string): string {
   const fastModels: Record<string, string> = {
     anthropic: 'claude-haiku-4-5-20251001',
     openai: 'gpt-4o-mini',
     google: 'gemini-2.0-flash-001',
   };
-  // If user selected the fast model already, use it; otherwise use provider's fast model
   return fastModels[providerId] ?? selectedModelId;
 }

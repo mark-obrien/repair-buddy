@@ -10,14 +10,16 @@ import { StepsTab } from '@/components/tabs/StepsTab';
 import { WarningsTab } from '@/components/tabs/WarningsTab';
 import { DiagramTab } from '@/components/tabs/DiagramTab';
 import { PartsDiagramTab } from '@/components/tabs/PartsDiagramTab';
+import { ShoppingTab } from '@/components/tabs/ShoppingTab';
 
 interface Props {
   guide: RepairGuide;
+  frames?: string[];
 }
 
-type TabId = 'overview' | 'parts' | 'tools' | 'torque' | 'steps' | 'warnings' | 'diagram' | 'parts-diagram';
+type TabId = 'overview' | 'parts' | 'tools' | 'torque' | 'steps' | 'warnings' | 'diagram' | 'parts-diagram' | 'shopping';
 
-export function GuideResults({ guide }: Props) {
+export function GuideResults({ guide, frames = [] }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('overview');
 
   const toolCount = guide.standardTools.length + guide.specialtyTools.length;
@@ -29,13 +31,14 @@ export function GuideResults({ guide }: Props) {
     { id: 'torque', label: 'Torque', count: guide.torqueValues.length },
     { id: 'steps', label: 'Steps', count: guide.repairSteps.length },
     { id: 'warnings', label: 'Warnings', count: guide.warnings.length },
+    { id: 'shopping', label: 'Shop', count: guide.partsNeeded.length },
     { id: 'parts-diagram', label: 'Parts Diagram' },
     { id: 'diagram', label: 'Process Flow' },
   ];
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-      <div className="overflow-x-auto border-b border-gray-200">
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm guide-printable">
+      <div className="overflow-x-auto border-b border-gray-200 print:hidden">
         <nav className="flex min-w-max">
           {tabs.map((tab) => {
             const isEmpty = tab.count === 0;
@@ -73,16 +76,52 @@ export function GuideResults({ guide }: Props) {
       </div>
 
       <div className="p-5">
-        {activeTab === 'overview' && <OverviewTab guide={guide} />}
-        {activeTab === 'parts' && <PartsTab parts={guide.partsNeeded} />}
-        {activeTab === 'tools' && (
-          <ToolsTab standardTools={guide.standardTools} specialtyTools={guide.specialtyTools} />
-        )}
-        {activeTab === 'torque' && <TorqueTab torqueValues={guide.torqueValues} />}
-        {activeTab === 'steps' && <StepsTab steps={guide.repairSteps} videoUrl={guide.videoUrl} />}
-        {activeTab === 'warnings' && <WarningsTab warnings={guide.warnings} />}
-        {activeTab === 'parts-diagram' && <PartsDiagramTab partsDiagram={guide.partsDiagram} />}
-        {activeTab === 'diagram' && <DiagramTab diagram={guide.diagram} />}
+        {/* Screen view: only the active tab */}
+        <div className="screen-view">
+          {activeTab === 'overview' && <OverviewTab guide={guide} />}
+          {activeTab === 'parts' && <PartsTab parts={guide.partsNeeded} />}
+          {activeTab === 'tools' && (
+            <ToolsTab standardTools={guide.standardTools} specialtyTools={guide.specialtyTools} />
+          )}
+          {activeTab === 'torque' && <TorqueTab torqueValues={guide.torqueValues} />}
+          {activeTab === 'steps' && <StepsTab steps={guide.repairSteps} videoUrl={guide.videoUrl} frames={frames} />}
+          {activeTab === 'warnings' && <WarningsTab warnings={guide.warnings} />}
+          {activeTab === 'shopping' && <ShoppingTab parts={guide.partsNeeded} vehicleInfo={guide.vehicleInfo} />}
+          {activeTab === 'parts-diagram' && <PartsDiagramTab partsDiagram={guide.partsDiagram} />}
+          {activeTab === 'diagram' && <DiagramTab diagram={guide.diagram} />}
+        </div>
+
+        {/* Print view: every tab rendered, in document order, for full PDF export */}
+        <div className="print-view hidden print:block space-y-8">
+          <section>
+            <h2 className="text-xl font-bold mb-3 print:text-black">Overview</h2>
+            <OverviewTab guide={guide} />
+          </section>
+          {guide.warnings.length > 0 && (
+            <section className="break-inside-avoid">
+              <h2 className="text-xl font-bold mb-3 print:text-black">Warnings</h2>
+              <WarningsTab warnings={guide.warnings} />
+            </section>
+          )}
+          <section className="break-inside-avoid">
+            <h2 className="text-xl font-bold mb-3 print:text-black">Parts</h2>
+            <PartsTab parts={guide.partsNeeded} />
+          </section>
+          <section className="break-inside-avoid">
+            <h2 className="text-xl font-bold mb-3 print:text-black">Tools</h2>
+            <ToolsTab standardTools={guide.standardTools} specialtyTools={guide.specialtyTools} />
+          </section>
+          {guide.torqueValues.length > 0 && (
+            <section className="break-inside-avoid">
+              <h2 className="text-xl font-bold mb-3 print:text-black">Torque Specifications</h2>
+              <TorqueTab torqueValues={guide.torqueValues} />
+            </section>
+          )}
+          <section>
+            <h2 className="text-xl font-bold mb-3 print:text-black">Steps</h2>
+            <StepsTab steps={guide.repairSteps} videoUrl={guide.videoUrl} frames={frames} />
+          </section>
+        </div>
       </div>
     </div>
   );

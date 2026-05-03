@@ -19,6 +19,23 @@ const repairGuideSchema = z.object({
 
   summary: z.string().describe('2-4 sentence summary of what repair is covered and the overall approach'),
 
+  difficulty: z
+    .enum(['beginner', 'intermediate', 'advanced', 'expert'])
+    .optional()
+    .describe(
+      'Estimated DIY difficulty. beginner=basic hand tools, no special skills (e.g. cabin filter, wiper blades). intermediate=requires mechanical aptitude and a typical home garage (e.g. brake pads, alternator). advanced=requires specialty tools, lifts, or multi-system knowledge (e.g. timing belts, head gaskets). expert=specialist tools/training (e.g. transmission rebuild, hybrid HV system).'
+    ),
+
+  difficultyReason: z
+    .string()
+    .optional()
+    .describe('One sentence explaining the difficulty rating — what makes this job easy or hard.'),
+
+  estimatedTimeMinutes: z
+    .number()
+    .optional()
+    .describe('Estimated total time in minutes for an attentive DIYer. Round to a sensible number. If the video states a time, prefer that; otherwise use repair knowledge.'),
+
   partsNeeded: z.array(z.object({
     name: z.string(),
     partNumber: z.string().optional().describe('OEM or aftermarket part number only if explicitly stated'),
@@ -51,6 +68,12 @@ const repairGuideSchema = z.object({
     description: z.string(),
     warnings: z.array(z.string()).optional(),
     timestampSeconds: z.number().optional().describe('Video timestamp in seconds where this step begins, estimated from the [MM:SS] markers in the transcript'),
+    frameIndex: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe('Index (0-based) into the provided frames array for the frame that best illustrates this step. Only set this if a frame clearly shows the step in question.'),
   })),
 
   warnings: z.array(z.string()).describe('Global warnings and cautions that apply to the entire job'),
@@ -71,7 +94,13 @@ const SYSTEM_PROMPT = `You are an expert automotive and appliance repair technic
 
 When research context is provided, use it as authoritative background knowledge. Cross-reference it against the video transcript and frames to produce the most accurate and complete guide possible. If the video contradicts the research on a factual point (e.g. a torque spec), prefer the video's explicit value but note the discrepancy.
 
+When viewer comments are provided, treat them as field-test feedback. They often catch errors, mention model-year variations, or warn about gotchas the presenter missed. Incorporate the most-upvoted, repair-relevant comments as warnings or step notes — but never invent part numbers or torque values from comments alone.
+
 VEHICLE INFO: Identify the specific vehicle, appliance, or equipment this repair applies to. Extract make, model, year or year range, and trim if mentioned. If the video covers multiple compatible vehicles note them in the notes field. If no specific vehicle is identified, set isGeneral=true and applicability to "Universal / General repair".
+
+DIFFICULTY: Rate the job on the four-level scale (beginner / intermediate / advanced / expert) using both the video evidence and your domain knowledge. Provide a one-sentence reason. Be honest — over-rating scares people off easy jobs and under-rating gets them stuck.
+
+ESTIMATED TIME: Estimate total active time in minutes for an attentive DIYer working at a normal pace. Include diagnosis and reassembly. Do NOT include curing/drying/cooling time unless that's the dominant cost. If the video states a time, prefer that.
 
 PARTS: Extract every part mentioned — OEM part numbers, aftermarket options, quantities, and brand recommendations. Only include part numbers if explicitly stated verbally.
 
@@ -82,6 +111,8 @@ SPECIALTY TOOLS: Identify non-standard tools. Always note purpose and any DIY al
 TORQUE VALUES: Extract every torque specification precisely as stated — never round or estimate. These are safety-critical.
 
 REPAIR STEPS: Extract 8-20 logical, actionable steps covering the full procedure. Include step-specific warnings inline. The transcript contains [MM:SS] timestamp markers — use the nearest preceding marker to estimate the timestampSeconds for each step (convert MM:SS to total seconds).
+
+FRAME INDEXING: When video frames are provided, you will see them attached as images in chronological order, indexed 0..N-1, evenly spaced from ~10% to ~85% of the video duration. For each repair step, set frameIndex to the index (0-based) of the frame that BEST illustrates that step visually. Pick the most informative frame, not necessarily the chronologically closest. If no provided frame clearly illustrates a step, omit frameIndex for that step. Do NOT invent a frameIndex outside the range of provided frames.
 
 WARNINGS: Extract all safety warnings, common mistakes, and "gotchas."
 
@@ -127,29 +158,34 @@ export async function generateRepairGuide(
   thumbnailUrl: string,
   frames: string[] = [],
   researchContext: string = '',
+  commentsContext: string = '',
   providerId: string = 'anthropic',
   modelId: string = 'claude-sonnet-4-6'
 ): Promise<RepairGuide> {
   const model = getModel(providerId, modelId);
 
   const frameNote = frames.length > 0
-    ? `\n\n${frames.length} VIDEO FRAMES are attached (chronological, 10%–85% of duration). Use them to identify actual component shapes and positions for the parts diagram.`
+    ? `\n\n${frames.length} VIDEO FRAMES are attached (chronological, 10%–85% of duration, indexed 0..${frames.length - 1}). Use them to identify component shapes and to set frameIndex on each repair step.`
     : '';
 
   const researchNote = researchContext
     ? `\n\nREPAIR RESEARCH CONTEXT (authoritative background — cross-reference with video):\n${researchContext}`
     : '';
 
-  const userText = `VIDEO TITLE: ${videoTitle}\nVIDEO URL: ${videoUrl}${researchNote}${frameNote}\n\nTRANSCRIPT:\n${transcript}`;
+  const commentsNote = commentsContext
+    ? `\n\nVIEWER COMMENTS (top-rated, may contain corrections or model-year notes):\n${commentsContext}`
+    : '';
+
+  const userText = `VIDEO TITLE: ${videoTitle}\nVIDEO URL: ${videoUrl}${researchNote}${commentsNote}${frameNote}\n\nTRANSCRIPT:\n${transcript}`;
 
   const result = await generateText({
     model,
-    maxOutputTokens: 12000,
+    maxTokens: 12000,
     system: SYSTEM_PROMPT,
     tools: {
       generate_repair_guide: tool({
-        description: 'Extract structured repair guide data from the video transcript, research context, and video frames.',
-        inputSchema: repairGuideSchema,
+        description: 'Extract structured repair guide data from the video transcript, research context, comments, and video frames.',
+        parameters: repairGuideSchema,
       }),
     },
     toolChoice: { type: 'tool', toolName: 'generate_repair_guide' },
@@ -175,7 +211,21 @@ export async function generateRepairGuide(
   }
 
   type GuideInput = z.infer<typeof repairGuideSchema>;
-  const extracted = (toolCall as { input: GuideInput }).input;
+  const extracted = (toolCall as unknown as { args: GuideInput }).args;
+
+  // Defensive: clamp any out-of-range frameIndex values to undefined so the UI
+  // doesn't try to render a non-existent frame.
+  if (extracted.repairSteps && frames.length > 0) {
+    for (const step of extracted.repairSteps) {
+      if (step.frameIndex != null && (step.frameIndex < 0 || step.frameIndex >= frames.length)) {
+        step.frameIndex = undefined;
+      }
+    }
+  } else if (extracted.repairSteps && frames.length === 0) {
+    for (const step of extracted.repairSteps) {
+      step.frameIndex = undefined;
+    }
+  }
 
   return {
     videoTitle,

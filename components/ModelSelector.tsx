@@ -22,7 +22,6 @@ export function ModelSelector({ providerId, modelId, onChange, disabled }: Props
   function handleProviderChange(newProviderId: string) {
     const newProvider = PROVIDERS.find((p) => p.id === newProviderId);
     if (!newProvider) return;
-    // Default to first model of new provider
     onChange(newProviderId, newProvider.models[0].id);
   }
 
@@ -36,7 +35,6 @@ export function ModelSelector({ providerId, modelId, onChange, disabled }: Props
     <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-gray-100">
       <span className="text-xs text-gray-400 font-medium shrink-0">Model</span>
 
-      {/* Provider tabs */}
       <div className="flex rounded-md border border-gray-200 overflow-hidden">
         {PROVIDERS.map((p) => (
           <button
@@ -55,7 +53,6 @@ export function ModelSelector({ providerId, modelId, onChange, disabled }: Props
         ))}
       </div>
 
-      {/* Model dropdown */}
       <select
         value={modelId}
         onChange={(e) => handleModelChange(e.target.value)}

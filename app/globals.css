@@ -7,3 +7,80 @@ body {
   color: #111827;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
+
+/* ---------------------------------------------------------------------------
+   Print / PDF export styles
+   --------------------------------------------------------------------------- */
+@media print {
+  body {
+    background: white;
+  }
+
+  /* Hide chrome and screen-only elements */
+  header,
+  .print\:hidden,
+  nav {
+    display: none !important;
+  }
+
+  main {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+
+  /* The "screen view" is the active-tab single panel; we hide it and show the
+     print view that renders every section sequentially. */
+  .screen-view {
+    display: none !important;
+  }
+  .print-view {
+    display: block !important;
+  }
+
+  .guide-printable {
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Print-friendly page setup */
+  @page {
+    margin: 0.6in;
+    size: letter;
+  }
+
+  /* Avoid awkward page breaks inside critical blocks */
+  .break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  h1, h2, h3, h4 {
+    color: #000 !important;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  /* Backgrounds + colors print accurately */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Thumbnails in step view — print smaller and inline rather than as buttons */
+  .print-view img {
+    max-width: 200px !important;
+    max-height: 150px !important;
+  }
+
+  /* Table widths — print uses available space */
+  table {
+    width: 100% !important;
+    font-size: 11pt !important;
+  }
+
+  /* Step cards a bit denser in print */
+  .print-view section {
+    margin-bottom: 1rem;
+  }
+}

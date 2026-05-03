@@ -1,101 +1,6 @@
-import {
-  YoutubeTranscript,
-  YoutubeTranscriptVideoUnavailableError,
-  YoutubeTranscriptDisabledError,
-  YoutubeTranscriptNotAvailableError,
-  YoutubeTranscriptTooManyRequestError,
-} from 'youtube-transcript';
+import { YoutubeTranscript } from 'youtube-transcript';
+import { transcribeWithWhisper, SpeechToTextError } from './speech-to-text';
 import { getCachedTranscript, cacheTranscript } from './cache';
-import { transcribeSpeech, SpeechToTextError } from './speech-to-text';
-
-const MAX_CHARS = 80_000;
-
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
-
-function buildTimedTranscript(items: Array<{ text: string; offset: number; duration: number }>): string {
-  // Emit a [MM:SS] marker at the start and then every ~30 seconds
-  const parts: string[] = [];
-  let lastMarkerAt = -30;
-  for (const item of items) {
-    const sec = Math.floor(item.offset / 1000);
-    if (sec - lastMarkerAt >= 30) {
-      parts.push(`[${formatTime(sec)}]`);
-      lastMarkerAt = sec;
-    }
-    parts.push(item.text);
-  }
-  return parts.join(' ');
-}
-
-export interface TranscriptResult {
-  text: string;
-  durationSeconds: number;
-  source: 'captions' | 'speech-to-text' | 'cache';
-}
-
-export async function fetchAndFormatTranscript(videoId: string): Promise<TranscriptResult> {
-  // Check cache first
-  const cached = await getCachedTranscript(videoId);
-  if (cached) {
-    return JSON.parse(cached);
-  }
-
-  let result: TranscriptResult;
-
-  // Try YouTube captions first
-  try {
-    const items = await YoutubeTranscript.fetchTranscript(videoId);
-    const lastItem = items[items.length - 1];
-    const durationSeconds = lastItem
-      ? Math.ceil((lastItem.offset + lastItem.duration) / 1000)
-      : 0;
-
-    const full = buildTimedTranscript(items);
-    const trimmed = full.length > MAX_CHARS
-      ? full.slice(0, full.lastIndexOf(' ', MAX_CHARS) || MAX_CHARS)
-      : full;
-
-    result = { text: trimmed, durationSeconds, source: 'captions' };
-    console.log(`✓ Captions fetched for ${videoId}`);
-  } catch (err) {
-    if (err instanceof YoutubeTranscriptTooManyRequestError) {
-      throw new TranscriptRateLimitError('YouTube rate limited the request — please try again shortly.');
-    }
-
-    if (err instanceof YoutubeTranscriptVideoUnavailableError) {
-      throw new TranscriptUnavailableError('This video is unavailable or private.');
-    }
-
-    if (err instanceof YoutubeTranscriptDisabledError || err instanceof YoutubeTranscriptNotAvailableError) {
-      // No captions — fall back to speech-to-text
-      console.log(`⚠ No captions, attempting speech-to-text for ${videoId}...`);
-      try {
-        const speechResult = await transcribeSpeech(`https://www.youtube.com/watch?v=${videoId}`);
-        const trimmed = speechResult.text.length > MAX_CHARS
-          ? speechResult.text.slice(0, speechResult.text.lastIndexOf(' ', MAX_CHARS) || MAX_CHARS)
-          : speechResult.text;
-        result = { text: trimmed, durationSeconds: speechResult.durationSeconds, source: 'speech-to-text' };
-        console.log(`✓ Speech-to-text succeeded for ${videoId}`);
-      } catch (speechErr) {
-        // Surface speech-to-text errors as unavailable so the UI shows a clear message
-        const detail = speechErr instanceof Error ? speechErr.message : 'unknown';
-        throw new TranscriptUnavailableError(
-          `This video has no captions and automatic transcription failed: ${detail}`
-        );
-      }
-    } else {
-      throw new TranscriptUnavailableError('Could not fetch the transcript for this video.');
-    }
-  }
-
-  // Cache the result
-  await cacheTranscript(videoId, JSON.stringify(result));
-  return result;
-}
 
 export class TranscriptUnavailableError extends Error {
   constructor(message: string) {
@@ -112,3 +17,98 @@ export class TranscriptRateLimitError extends Error {
 }
 
 export { SpeechToTextError };
+
+export interface TranscriptResult {
+  text: string;
+  durationSeconds: number;
+}
+
+function formatTimestamp(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function formatTranscript(items: Array<{ text: string; offset: number }>): TranscriptResult {
+  if (items.length === 0) return { text: '', durationSeconds: 0 };
+
+  const chunks: string[] = [];
+  let currentChunkText: string[] = [];
+  let currentChunkStart = items[0].offset;
+  const CHUNK_SECONDS = 30;
+
+  for (const item of items) {
+    if (item.offset - currentChunkStart >= CHUNK_SECONDS && currentChunkText.length > 0) {
+      chunks.push(`[${formatTimestamp(currentChunkStart)}] ${currentChunkText.join(' ')}`);
+      currentChunkText = [];
+      currentChunkStart = item.offset;
+    }
+    currentChunkText.push(item.text.replace(/\s+/g, ' ').trim());
+  }
+
+  if (currentChunkText.length > 0) {
+    chunks.push(`[${formatTimestamp(currentChunkStart)}] ${currentChunkText.join(' ')}`);
+  }
+
+  const last = items[items.length - 1];
+  return {
+    text: chunks.join('\n\n'),
+    durationSeconds: Math.ceil(last.offset),
+  };
+}
+
+async function fetchYoutubeTranscript(videoId: string): Promise<TranscriptResult> {
+  try {
+    const items = await YoutubeTranscript.fetchTranscript(videoId);
+    if (!items || items.length === 0) {
+      throw new TranscriptUnavailableError('Transcript is empty.');
+    }
+    return formatTranscript(items.map((i) => ({ text: i.text, offset: i.offset })));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('429') || msg.toLowerCase().includes('rate') || msg.toLowerCase().includes('too many')) {
+      throw new TranscriptRateLimitError('YouTube is rate-limiting transcript requests. Please try again in a few minutes.');
+    }
+    if (msg.toLowerCase().includes('disabled') || msg.toLowerCase().includes('unavailable') ||
+        msg.toLowerCase().includes('no transcript') || msg.toLowerCase().includes('captions')) {
+      throw new TranscriptUnavailableError(msg);
+    }
+    throw new TranscriptUnavailableError(`Failed to fetch transcript: ${msg}`);
+  }
+}
+
+export async function fetchAndFormatTranscript(videoId: string): Promise<TranscriptResult> {
+  const cached = await getCachedTranscript(videoId);
+  if (cached) {
+    // Try to recover the duration from the last timestamp marker
+    const matches = [...cached.matchAll(/\[(\d+):(\d+)\]/g)];
+    const lastMatch = matches[matches.length - 1];
+    const durationSeconds = lastMatch
+      ? parseInt(lastMatch[1], 10) * 60 + parseInt(lastMatch[2], 10) + 30
+      : 0;
+    return { text: cached, durationSeconds };
+  }
+
+  let result: TranscriptResult;
+  try {
+    result = await fetchYoutubeTranscript(videoId);
+  } catch (err) {
+    if (err instanceof TranscriptRateLimitError) throw err;
+    if (err instanceof TranscriptUnavailableError) {
+      // Try Whisper fallback
+      try {
+        result = await transcribeWithWhisper(videoId);
+      } catch (whisperErr) {
+        if (whisperErr instanceof SpeechToTextError) throw whisperErr;
+        throw new TranscriptUnavailableError(
+          'No captions available and Whisper transcription failed. Try a different video.'
+        );
+      }
+    } else {
+      throw err;
+    }
+  }
+
+  await cacheTranscript(videoId, result.text);
+  return result;
+}

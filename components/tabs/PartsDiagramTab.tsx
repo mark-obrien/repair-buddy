@@ -25,19 +25,15 @@ function sanitizeSvg(raw: string): string {
 function prepareSvg(raw: string): string {
   let svg = sanitizeSvg(raw);
 
-  // Ensure white background by injecting a rect as first child if not present
   if (!svg.includes('fill="white"') && !svg.includes("fill='white'") && !svg.includes('fill="#fff')) {
     svg = svg.replace(/(<svg[^>]*>)/, '$1<rect width="100%" height="100%" fill="white"/>');
   }
 
-  // Strip any fixed pixel width/height so CSS controls sizing
   svg = svg.replace(/(<svg[^>]*)\bwidth\s*=\s*["']\d[^"']*["']/i, '$1');
   svg = svg.replace(/(<svg[^>]*)\bheight\s*=\s*["']\d[^"']*["']/i, '$1');
-  // Remove percentage / auto values too
   svg = svg.replace(/(<svg[^>]*)\bwidth\s*=\s*["'][^"']*["']/i, '$1');
   svg = svg.replace(/(<svg[^>]*)\bheight\s*=\s*["'][^"']*["']/i, '$1');
 
-  // Inject sizing + aspect-ratio control via style attribute
   svg = svg.replace(
     /(<svg\b)/i,
     '<svg style="display:block;width:100%;height:100%;" preserveAspectRatio="xMidYMid meet"'
@@ -125,8 +121,7 @@ export function PartsDiagramTab({ partsDiagram }: Props) {
 
   return (
     <div className="space-y-3">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 print:hidden">
         <span className="text-xs text-gray-500">Scroll to zoom · Drag to pan</span>
         <div className="flex items-center gap-1 ml-auto">
           <button onClick={() => setScale((s) => Math.min(s + 0.2, 5))}
@@ -143,7 +138,6 @@ export function PartsDiagramTab({ partsDiagram }: Props) {
         </div>
       </div>
 
-      {/* Canvas */}
       <div
         ref={containerRef}
         className="relative rounded-lg border border-gray-200 bg-white cursor-grab active:cursor-grabbing touch-none select-none overflow-hidden"
@@ -153,9 +147,7 @@ export function PartsDiagramTab({ partsDiagram }: Props) {
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
       >
-        {/* Centring layer */}
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-          {/* Transform layer */}
           <div
             style={{
               width: '100%',

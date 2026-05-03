@@ -1,8 +1,12 @@
+'use client';
+
+import { useState } from 'react';
 import type { RepairGuide } from '@/lib/types';
 
 interface Props {
   steps: RepairGuide['repairSteps'];
   videoUrl: string;
+  frames?: string[];
 }
 
 function buildTimestampUrl(videoUrl: string, seconds: number): string {
@@ -21,7 +25,9 @@ function formatTime(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export function StepsTab({ steps, videoUrl }: Props) {
+export function StepsTab({ steps, videoUrl, frames = [] }: Props) {
+  const [lightbox, setLightbox] = useState<string | null>(null);
+
   if (steps.length === 0) {
     return (
       <div className="text-center py-10 text-gray-400">
@@ -33,40 +39,83 @@ export function StepsTab({ steps, videoUrl }: Props) {
 
   return (
     <div className="space-y-3">
-      {steps.map((step) => (
-        <div key={step.step} className="flex gap-4 p-4 bg-white border border-gray-200 rounded-lg">
-          <div className="shrink-0 w-9 h-9 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold text-sm">
-            {step.step}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2 mb-1">
-              <h4 className="font-semibold text-gray-900 text-sm">{step.title}</h4>
-              {step.timestampSeconds != null && (
-                <a
-                  href={buildTimestampUrl(videoUrl, step.timestampSeconds)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="shrink-0 flex items-center gap-1 text-xs text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded px-1.5 py-0.5 transition-colors"
-                  title="Watch this step on YouTube"
-                >
-                  ▶ {formatTime(step.timestampSeconds)}
-                </a>
+      {steps.map((step) => {
+        const hasFrame =
+          step.frameIndex != null &&
+          step.frameIndex >= 0 &&
+          step.frameIndex < frames.length;
+        const frameSrc = hasFrame ? `data:image/jpeg;base64,${frames[step.frameIndex!]}` : null;
+
+        return (
+          <div key={step.step} className="flex gap-4 p-4 bg-white border border-gray-200 rounded-lg break-inside-avoid">
+            <div className="shrink-0 w-9 h-9 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold text-sm">
+              {step.step}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2 mb-1">
+                <h4 className="font-semibold text-gray-900 text-sm">{step.title}</h4>
+                {step.timestampSeconds != null && (
+                  <a
+                    href={buildTimestampUrl(videoUrl, step.timestampSeconds)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 flex items-center gap-1 text-xs text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded px-1.5 py-0.5 transition-colors print:hidden"
+                    title="Watch this step on YouTube"
+                  >
+                    ▶ {formatTime(step.timestampSeconds)}
+                  </a>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                {frameSrc && (
+                  <button
+                    type="button"
+                    onClick={() => setLightbox(frameSrc)}
+                    className="shrink-0 print:hidden"
+                    title="Click to enlarge"
+                  >
+                    {/* Using <img> intentionally — base64 data URLs aren't compatible with next/image */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={frameSrc}
+                      alt={`Frame for step ${step.step}`}
+                      className="w-32 h-20 object-cover rounded border border-gray-200 hover:border-orange-400 transition-colors cursor-zoom-in"
+                    />
+                  </button>
+                )}
+                <p className="text-sm text-gray-600 leading-relaxed flex-1">{step.description}</p>
+              </div>
+
+              {step.warnings && step.warnings.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {step.warnings.map((w, i) => (
+                    <li key={i} className="flex gap-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded px-2 py-1">
+                      <span className="shrink-0">⚠️</span>
+                      {w}
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
-            <p className="text-sm text-gray-600 leading-relaxed">{step.description}</p>
-            {step.warnings && step.warnings.length > 0 && (
-              <ul className="mt-2 space-y-1">
-                {step.warnings.map((w, i) => (
-                  <li key={i} className="flex gap-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded px-2 py-1">
-                    <span className="shrink-0">⚠️</span>
-                    {w}
-                  </li>
-                ))}
-              </ul>
-            )}
           </div>
+        );
+      })}
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setLightbox(null)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightbox}
+            alt="Step frame"
+            className="max-w-full max-h-full rounded-lg shadow-2xl"
+          />
         </div>
-      ))}
+      )}
     </div>
   );
 }
