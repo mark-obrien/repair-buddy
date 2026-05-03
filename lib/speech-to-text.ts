@@ -1,10 +1,11 @@
 import OpenAI from 'openai';
 import ytdl from '@distube/ytdl-core';
 import ffmpeg from 'fluent-ffmpeg';
+import { spawn } from 'child_process';
 import { Readable } from 'stream';
 import { writeFile, unlink, mkdtemp } from 'fs/promises';
 import { tmpdir } from 'os';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import type { TranscriptResult } from './transcript';
 
 export class SpeechToTextError extends Error {
@@ -21,7 +22,65 @@ if (FFMPEG_PATH) {
 
 const MAX_AUDIO_SIZE_MB = 24;
 
-async function downloadAndExtractAudio(videoUrl: string): Promise<{ filePath: string; tempDir: string }> {
+// ---------------------------------------------------------------------------
+// yt-dlp based download (preferred — handles current YouTube format changes)
+// ---------------------------------------------------------------------------
+
+async function downloadAudioWithYtDlp(
+  videoUrl: string
+): Promise<{ filePath: string; tempDir: string }> {
+  const tempDir = await mkdtemp(join(tmpdir(), 'repairbuddy-audio-'));
+  // yt-dlp replaces %(ext)s; we expect mp3 after --audio-format mp3
+  const outputTemplate = join(tempDir, 'audio.%(ext)s');
+  const expectedPath = join(tempDir, 'audio.mp3');
+
+  return new Promise((resolve, reject) => {
+    const ytdlpBin = process.env.YTDLP_PATH ?? 'yt-dlp';
+
+    const args: string[] = [
+      '-f', 'bestaudio[ext=m4a]/bestaudio/best',
+      '-x',
+      '--audio-format', 'mp3',
+      '--audio-quality', '48K',
+      '--no-playlist',
+      '--no-progress',
+      '--quiet',
+    ];
+
+    // Tell yt-dlp where ffmpeg lives if we have a custom path
+    if (FFMPEG_PATH) {
+      args.push('--ffmpeg-location', dirname(FFMPEG_PATH));
+    }
+
+    args.push('-o', outputTemplate, videoUrl);
+
+    const proc = spawn(ytdlpBin, args);
+    let stderr = '';
+    proc.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
+
+    proc.on('close', (code) => {
+      if (code === 0) {
+        resolve({ filePath: expectedPath, tempDir });
+      } else {
+        reject(
+          new SpeechToTextError(`yt-dlp failed (exit ${code}): ${stderr.slice(-400)}`)
+        );
+      }
+    });
+
+    proc.on('error', (err: NodeJS.ErrnoException) => {
+      reject(new SpeechToTextError(`yt-dlp spawn error: ${err.message}`));
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// ytdl-core based download (fallback when yt-dlp is not installed)
+// ---------------------------------------------------------------------------
+
+async function downloadAudioWithYtdlCore(
+  videoUrl: string
+): Promise<{ filePath: string; tempDir: string }> {
   const tempDir = await mkdtemp(join(tmpdir(), 'repairbuddy-audio-'));
   const audioPath = join(tempDir, 'audio.mp3');
 
@@ -38,14 +97,44 @@ async function downloadAndExtractAudio(videoUrl: string): Promise<{ filePath: st
         .audioChannels(1)
         .audioFrequency(16000)
         .format('mp3')
-        .on('error', (err) => reject(new SpeechToTextError(`Audio extraction failed: ${err.message}`)))
+        .on('error', (err) =>
+          reject(new SpeechToTextError(`Audio extraction failed: ${err.message}`))
+        )
         .on('end', () => resolve({ filePath: audioPath, tempDir }))
         .save(audioPath);
     } catch (err) {
-      reject(new SpeechToTextError(err instanceof Error ? err.message : 'Audio download failed'));
+      reject(
+        new SpeechToTextError(
+          err instanceof Error ? err.message : 'Audio download failed'
+        )
+      );
     }
   });
 }
+
+// ---------------------------------------------------------------------------
+// Unified download: try yt-dlp first, fall back to ytdl-core if not installed
+// ---------------------------------------------------------------------------
+
+async function downloadAndExtractAudio(
+  videoUrl: string
+): Promise<{ filePath: string; tempDir: string }> {
+  try {
+    return await downloadAudioWithYtDlp(videoUrl);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : '';
+    // ENOENT / "not found" means yt-dlp binary is absent — try ytdl-core
+    if (msg.includes('ENOENT') || msg.toLowerCase().includes('not found')) {
+      console.warn('yt-dlp not found, falling back to ytdl-core for audio');
+      return downloadAudioWithYtdlCore(videoUrl);
+    }
+    throw err;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Public entry point
+// ---------------------------------------------------------------------------
 
 export async function transcribeWithWhisper(videoId: string): Promise<TranscriptResult> {
   if (!process.env.OPENAI_API_KEY) {
@@ -64,7 +153,7 @@ export async function transcribeWithWhisper(videoId: string): Promise<Transcript
     const stats = await fs.promises.stat(audioPath);
     if (stats.size > MAX_AUDIO_SIZE_MB * 1024 * 1024) {
       throw new SpeechToTextError(
-        `Audio file is too large for Whisper (${(stats.size / 1024 / 1024).toFixed(1)}MB > ${MAX_AUDIO_SIZE_MB}MB).`
+        `Audio file too large for Whisper (${(stats.size / 1024 / 1024).toFixed(1)} MB > ${MAX_AUDIO_SIZE_MB} MB).`
       );
     }
 
@@ -79,7 +168,8 @@ export async function transcribeWithWhisper(videoId: string): Promise<Transcript
       timestamp_granularities: ['segment'],
     });
 
-    const segments = (result as { segments?: Array<{ start: number; text: string }> }).segments ?? [];
+    const segments =
+      (result as { segments?: Array<{ start: number; text: string }> }).segments ?? [];
     if (segments.length === 0) {
       throw new SpeechToTextError('Whisper returned no segments.');
     }
@@ -112,7 +202,9 @@ export async function transcribeWithWhisper(videoId: string): Promise<Transcript
     };
   } catch (err) {
     if (err instanceof SpeechToTextError) throw err;
-    throw new SpeechToTextError(err instanceof Error ? err.message : 'Whisper transcription failed.');
+    throw new SpeechToTextError(
+      err instanceof Error ? err.message : 'Whisper transcription failed.'
+    );
   } finally {
     if (audioPath) {
       try { await unlink(audioPath); } catch { /* ignore */ }
