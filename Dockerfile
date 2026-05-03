@@ -20,12 +20,17 @@ RUN apk add --no-cache ffmpeg && \
     addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+ENV FFMPEG_PATH=/usr/bin/ffmpeg
+
+RUN mkdir -p /app/.next/cache && chown -R nextjs:nodejs /app/.next/cache
+
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/next.config.mjs ./next.config.mjs
 
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-CMD ["node", "server.js"]
+CMD ["npm", "start"]

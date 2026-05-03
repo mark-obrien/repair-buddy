@@ -8,20 +8,21 @@ import type { RepairGuide } from './types';
 // ---------------------------------------------------------------------------
 const repairGuideSchema = z.object({
   vehicleInfo: z.object({
-    applicability: z.string().describe('Human-readable summary: e.g. "2018-2022 Toyota Camry" or "Universal / most vehicles"'),
-    make: z.string().optional(),
-    model: z.string().optional(),
-    yearRange: z.string().optional().describe('e.g. "2018-2022" or "2020"'),
-    trim: z.string().optional().describe('e.g. "All trims" or "LE, SE, XSE"'),
-    notes: z.string().optional().describe('Additional compatibility info, e.g. platform mates or model variants'),
-    isGeneral: z.boolean().describe('true when no specific vehicle/appliance is identified'),
-  }),
+    applicability: z.string().catch('Universal / General repair').describe('Human-readable summary: e.g. "2018-2022 Toyota Camry" or "Universal / most vehicles"'),
+    make: z.string().optional().catch(undefined),
+    model: z.string().optional().catch(undefined),
+    yearRange: z.string().optional().catch(undefined).describe('e.g. "2018-2022" or "2020"'),
+    trim: z.string().optional().catch(undefined).describe('e.g. "All trims" or "LE, SE, XSE"'),
+    notes: z.string().optional().catch(undefined).describe('Additional compatibility info, e.g. platform mates or model variants'),
+    isGeneral: z.boolean().catch(false).describe('true when no specific vehicle/appliance is identified'),
+  }).catch({ applicability: 'Universal / General repair', isGeneral: true }),
 
-  summary: z.string().describe('2-4 sentence summary of what repair is covered and the overall approach'),
+  summary: z.string().catch('No summary provided.').describe('2-4 sentence summary of what repair is covered and the overall approach'),
 
   difficulty: z
     .enum(['beginner', 'intermediate', 'advanced', 'expert'])
     .optional()
+    .catch('intermediate' as any)
     .describe(
       'Estimated DIY difficulty. beginner=basic hand tools, no special skills (e.g. cabin filter, wiper blades). intermediate=requires mechanical aptitude and a typical home garage (e.g. brake pads, alternator). advanced=requires specialty tools, lifts, or multi-system knowledge (e.g. timing belts, head gaskets). expert=specialist tools/training (e.g. transmission rebuild, hybrid HV system).'
     ),
@@ -29,60 +30,63 @@ const repairGuideSchema = z.object({
   difficultyReason: z
     .string()
     .optional()
+    .catch(undefined)
     .describe('One sentence explaining the difficulty rating — what makes this job easy or hard.'),
 
   estimatedTimeMinutes: z
     .number()
     .optional()
+    .catch(undefined)
     .describe('Estimated total time in minutes for an attentive DIYer. Round to a sensible number. If the video states a time, prefer that; otherwise use repair knowledge.'),
 
   partsNeeded: z.array(z.object({
-    name: z.string(),
-    partNumber: z.string().optional().describe('OEM or aftermarket part number only if explicitly stated'),
-    quantity: z.number().optional(),
-    notes: z.string().optional().describe('Brand recommendations, fitment notes, fluid spec, etc.'),
-  })),
+    name: z.string().catch('Unnamed part'),
+    partNumber: z.string().optional().catch(undefined).describe('OEM or aftermarket part number only if explicitly stated'),
+    quantity: z.number().optional().catch(undefined),
+    notes: z.string().optional().catch(undefined).describe('Brand recommendations, fitment notes, fluid spec, etc.'),
+  })).catch([]),
 
   standardTools: z.array(z.object({
-    name: z.string(),
-    size: z.string().optional().describe('Socket size, wrench size, bit size, etc.'),
-    notes: z.string().optional(),
-  })),
+    name: z.string().catch('Unnamed tool'),
+    size: z.string().optional().catch(undefined).describe('Socket size, wrench size, bit size, etc.'),
+    notes: z.string().optional().catch(undefined),
+  })).catch([]),
 
   specialtyTools: z.array(z.object({
-    name: z.string(),
-    purpose: z.string(),
-    altMethod: z.string().optional().describe('Alternative DIY method if specialty tool unavailable'),
-  })),
+    name: z.string().catch('Unnamed specialty tool'),
+    purpose: z.string().catch('Unknown purpose'),
+    altMethod: z.string().optional().catch(undefined).describe('Alternative DIY method if specialty tool unavailable'),
+  })).catch([]),
 
   torqueValues: z.array(z.object({
-    component: z.string(),
-    value: z.string(),
-    unit: z.enum(['ft-lbs', 'Nm', 'in-lbs', 'kg-m']),
-    notes: z.string().optional().describe('Stage torque, angle tightening, sequence info, etc.'),
-  })),
+    component: z.string().catch('Unnamed component'),
+    value: z.string().catch(''),
+    unit: z.string().catch(''),
+    notes: z.string().optional().catch(undefined).describe('Stage torque, angle tightening, sequence info, etc.'),
+  })).catch([]),
 
   repairSteps: z.array(z.object({
-    step: z.number(),
-    title: z.string().describe('Short title for this step (5-10 words)'),
-    description: z.string(),
-    warnings: z.array(z.string()).optional(),
-    timestampSeconds: z.number().optional().describe('Video timestamp in seconds where this step begins, estimated from the [MM:SS] markers in the transcript'),
+    step: z.number().catch(1),
+    title: z.string().catch('Repair Step').describe('Short title for this step (5-10 words)'),
+    description: z.string().catch('Follow video instructions.'),
+    warnings: z.array(z.string()).optional().catch([]),
+    timestampSeconds: z.number().optional().catch(undefined).describe('Video timestamp in seconds where this step begins, estimated from the [MM:SS] markers in the transcript'),
     frameIndex: z
       .number()
       .int()
       .min(0)
       .optional()
+      .catch(undefined)
       .describe('Index (0-based) into the provided frames array for the frame that best illustrates this step. Only set this if a frame clearly shows the step in question.'),
-  })),
+  })).catch([]),
 
-  warnings: z.array(z.string()).describe('Global warnings and cautions that apply to the entire job'),
+  warnings: z.array(z.string()).catch([]).describe('Global warnings and cautions that apply to the entire job'),
 
-  diagram: z.string().describe(
+  diagram: z.string().catch('').describe(
     "Valid Mermaid flowchart TD syntax. First line must be 'flowchart TD'. Short labels only."
   ),
 
-  partsDiagram: z.string().describe(
+  partsDiagram: z.string().optional().catch(undefined).describe(
     'Complete self-contained SVG schematic. Root: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">. White background rect first. Title at top. Components in center region. Legend box bottom-right. No scripts, no external refs.'
   ),
 });
