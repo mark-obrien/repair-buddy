@@ -70,7 +70,7 @@ const repairGuideSchema = z.object({
     title: z.string().catch('Repair Step').describe('Short title for this step (5-10 words)'),
     description: z.string().catch('Follow video instructions.'),
     warnings: z.array(z.string()).optional().catch([]),
-    timestampSeconds: z.number().optional().catch(undefined).describe('Video timestamp in seconds where this step begins. Use the [MM:SS] marker that immediately precedes the step\'s action in the transcript. Convert exactly: MM*60+SS. E.g. [3:40] → 220. Do not round.'),
+    timestamp: z.string().optional().catch(undefined).describe('The exact [MM:SS] timestamp marker from the transcript where this step begins. E.g., "04:15" or "12:30". Do NOT calculate seconds.'),
     frameIndex: z
       .number()
       .int()
@@ -123,7 +123,7 @@ SPECIALTY TOOLS: Identify non-standard tools. Always note purpose and any DIY al
 
 TORQUE VALUES: Extract every torque specification precisely as stated — never round or estimate. These are safety-critical.
 
-REPAIR STEPS: Extract 8-20 logical, actionable steps covering the full procedure. Include step-specific warnings inline. The transcript contains [MM:SS] timestamp markers every ~10 seconds — for each step, find the [MM:SS] marker that immediately precedes the relevant transcript text, convert it to total seconds (MM*60+SS), and set that as timestampSeconds. Be precise: do not round to the nearest 30 or 60 seconds. If the step spans multiple markers, use the marker where the step's key action begins.
+REPAIR STEPS: Extract 8-20 logical, actionable steps covering the full procedure. Include step-specific warnings inline. The transcript contains [MM:SS] timestamp markers every ~10 seconds — for each step, find the [MM:SS] marker that immediately precedes the relevant transcript text, and return that exact string (e.g., "04:15" or "1:02:30") as the timestamp. Do NOT attempt to calculate total seconds.
 
 FRAME INDEXING: When video frames are provided, you will see them attached as images in chronological order, indexed 0..N-1, evenly spaced from ~10% to ~85% of the video duration. For each repair step, set frameIndex to the index (0-based) of the frame that BEST illustrates that step visually. Pick the most informative frame, not necessarily the chronologically closest. If no provided frame clearly illustrates a step, omit frameIndex for that step. Do NOT invent a frameIndex outside the range of provided frames.
 
@@ -228,17 +228,30 @@ export async function generateRepairGuide(
   type GuideInput = z.infer<typeof repairGuideSchema>;
   const extracted = (toolCall as unknown as { args: GuideInput }).args;
 
-  // Defensive: clamp any out-of-range frameIndex values to undefined so the UI
-  // doesn't try to render a non-existent frame.
-  if (extracted.repairSteps && frames.length > 0) {
-    for (const step of extracted.repairSteps) {
-      if (step.frameIndex != null && (step.frameIndex < 0 || step.frameIndex >= frames.length)) {
+  // Map string timestamps to timestampSeconds for the frontend
+  if (extracted.repairSteps) {
+    for (const step of extracted.repairSteps as any) {
+      if (step.timestamp) {
+        // Strip out brackets if the LLM included them like "[04:15]"
+        const cleanStr = step.timestamp.replace(/[\[\]]/g, '').trim();
+        const parts = cleanStr.split(':').map(Number);
+        
+        if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+          step.timestampSeconds = parts[0] * 60 + parts[1];
+        } else if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+          step.timestampSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+        }
+        delete step.timestamp;
+      }
+      
+      // Defensive: clamp any out-of-range frameIndex values to undefined
+      if (step.frameIndex != null && frames.length > 0) {
+        if (step.frameIndex < 0 || step.frameIndex >= frames.length) {
+          step.frameIndex = undefined;
+        }
+      } else if (frames.length === 0) {
         step.frameIndex = undefined;
       }
-    }
-  } else if (extracted.repairSteps && frames.length === 0) {
-    for (const step of extracted.repairSteps) {
-      step.frameIndex = undefined;
     }
   }
 
@@ -246,6 +259,6 @@ export async function generateRepairGuide(
     videoTitle,
     videoUrl,
     thumbnailUrl,
-    ...extracted,
+    ...(extracted as any), // Cast to any to bypass the missing timestampSeconds in GuideInput
   };
 }
