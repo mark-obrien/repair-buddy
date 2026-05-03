@@ -70,7 +70,7 @@ const repairGuideSchema = z.object({
     title: z.string().catch('Repair Step').describe('Short title for this step (5-10 words)'),
     description: z.string().catch('Follow video instructions.'),
     warnings: z.array(z.string()).optional().catch([]),
-    timestampSeconds: z.number().optional().catch(undefined).describe('Video timestamp in seconds where this step begins, estimated from the [MM:SS] markers in the transcript'),
+    timestampSeconds: z.number().optional().catch(undefined).describe('Video timestamp in seconds where this step begins. Use the [MM:SS] marker that immediately precedes the step\'s action in the transcript. Convert exactly: MM*60+SS. E.g. [3:40] → 220. Do not round.'),
     frameIndex: z
       .number()
       .int()
@@ -114,7 +114,7 @@ SPECIALTY TOOLS: Identify non-standard tools. Always note purpose and any DIY al
 
 TORQUE VALUES: Extract every torque specification precisely as stated — never round or estimate. These are safety-critical.
 
-REPAIR STEPS: Extract 8-20 logical, actionable steps covering the full procedure. Include step-specific warnings inline. The transcript contains [MM:SS] timestamp markers — use the nearest preceding marker to estimate the timestampSeconds for each step (convert MM:SS to total seconds).
+REPAIR STEPS: Extract 8-20 logical, actionable steps covering the full procedure. Include step-specific warnings inline. The transcript contains [MM:SS] timestamp markers every ~10 seconds — for each step, find the [MM:SS] marker that immediately precedes the relevant transcript text, convert it to total seconds (MM*60+SS), and set that as timestampSeconds. Be precise: do not round to the nearest 30 or 60 seconds. If the step spans multiple markers, use the marker where the step's key action begins.
 
 FRAME INDEXING: When video frames are provided, you will see them attached as images in chronological order, indexed 0..N-1, evenly spaced from ~10% to ~85% of the video duration. For each repair step, set frameIndex to the index (0-based) of the frame that BEST illustrates that step visually. Pick the most informative frame, not necessarily the chronologically closest. If no provided frame clearly illustrates a step, omit frameIndex for that step. Do NOT invent a frameIndex outside the range of provided frames.
 

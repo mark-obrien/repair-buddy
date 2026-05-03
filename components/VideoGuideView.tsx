@@ -168,18 +168,17 @@ export function VideoGuideView({ guide, frames = [] }: Props) {
   const activeStep = activeStepIndex >= 0 ? guide.repairSteps[activeStepIndex] : null;
 
   return (
-    <div className="flex flex-col lg:grid lg:grid-cols-[1fr_360px]">
+    <div className="flex flex-col md:grid md:grid-cols-[1fr_300px] lg:grid-cols-[1fr_360px]">
 
       {/* ── Video column ───────────────────────────────────────── */}
       <div className="bg-black">
-        {/* Aspect-ratio wrapper constrains the iframe */}
         <div className="relative w-full aspect-video">
           <div id="yt-player-host" className="absolute inset-0 w-full h-full" />
         </div>
 
-        {/* Active step banner shown below video on mobile only */}
+        {/* Active step pill — only visible on narrow screens below the video */}
         {activeStep && (
-          <div className="flex items-center gap-2 px-3 py-2 bg-zinc-900 border-t border-zinc-700 lg:hidden">
+          <div className="flex items-center gap-2 px-3 py-2 bg-zinc-900 border-t border-zinc-700 md:hidden">
             <div className="shrink-0 w-5 h-5 rounded-full bg-orange-500 text-white flex items-center justify-center text-xs font-bold">
               {activeStep.step}
             </div>
@@ -190,11 +189,11 @@ export function VideoGuideView({ guide, frames = [] }: Props) {
 
       {/* ── Steps column ───────────────────────────────────────── */}
       {/*
-        min-h-0 as a grid item prevents this column from expanding the grid row
-        height beyond the video side. flex flex-col makes the inner overflow
-        work correctly (the scrollable child fills remaining height).
+        min-h-0 prevents this grid item from expanding the row beyond the
+        video's aspect-ratio height. flex flex-col + flex-1 on the list
+        makes inner overflow-y work correctly within that constrained height.
       */}
-      <div className="min-h-0 flex flex-col border-t lg:border-t-0 lg:border-l border-gray-200">
+      <div className="min-h-0 flex flex-col border-t md:border-t-0 md:border-l border-gray-200">
 
         {/* Column header */}
         <div className="shrink-0 flex items-center justify-between px-3 py-2.5 bg-gray-50 border-b border-gray-200">
@@ -208,7 +207,7 @@ export function VideoGuideView({ guide, frames = [] }: Props) {
         </div>
 
         {/* Scrollable steps list */}
-        <div className="flex-1 overflow-y-auto min-h-0 max-h-[55vh] lg:max-h-none">
+        <div className="flex-1 overflow-y-auto min-h-0 max-h-[50vh] md:max-h-none">
           {guide.repairSteps.map((step, index) => {
             const isActive = index === activeStepIndex;
             const hasTs = step.timestampSeconds != null;
