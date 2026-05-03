@@ -35,7 +35,7 @@ function formatTranscript(items: Array<{ text: string; offset: number }>): Trans
   const chunks: string[] = [];
   let currentChunkText: string[] = [];
   let currentChunkStart = items[0].offset;
-  const CHUNK_SECONDS = 30;
+  const CHUNK_SECONDS = 10;
 
   for (const item of items) {
     if (item.offset - currentChunkStart >= CHUNK_SECONDS && currentChunkText.length > 0) {

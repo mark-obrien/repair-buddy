@@ -177,7 +177,7 @@ export async function transcribeWithWhisper(videoId: string): Promise<Transcript
     const lines: string[] = [];
     let currentChunkText: string[] = [];
     let currentChunkStart = segments[0].start;
-    const CHUNK_SECONDS = 30;
+    const CHUNK_SECONDS = 10;
 
     for (const seg of segments) {
       if (seg.start - currentChunkStart >= CHUNK_SECONDS && currentChunkText.length > 0) {
