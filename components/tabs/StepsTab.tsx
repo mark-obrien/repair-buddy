@@ -7,6 +7,7 @@ interface Props {
   steps: RepairGuide['repairSteps'];
   videoUrl: string;
   frames?: string[];
+  annotations?: RepairGuide['frameAnnotations'];
 }
 
 function buildTimestampUrl(videoUrl: string, seconds: number): string {
@@ -25,8 +26,41 @@ function formatTime(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export function StepsTab({ steps, videoUrl, frames = [] }: Props) {
-  const [lightbox, setLightbox] = useState<string | null>(null);
+function FrameWithAnnotations({ 
+  src, 
+  alt, 
+  className, 
+  imageClassName = '',
+  annotations 
+}: { 
+  src: string; 
+  alt: string; 
+  className: string; 
+  imageClassName?: string;
+  annotations?: Array<{ label: string; x: number; y: number; }>;
+}) {
+  return (
+    <div className={`relative ${className}`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt={alt} className={`w-full h-full object-cover ${imageClassName}`} />
+      {annotations?.map((ann, i) => (
+        <div 
+          key={i} 
+          className="absolute flex flex-col items-center gap-1 -translate-x-1/2 -translate-y-1/2 group pointer-events-auto"
+          style={{ left: `${ann.x}%`, top: `${ann.y}%` }}
+        >
+          <div className="w-3 h-3 rounded-full bg-orange-500 border-[1.5px] border-white shadow shadow-black/50 animate-pulse group-hover:scale-125 transition-transform" />
+          <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/90 text-white text-[10px] font-bold px-1.5 py-0.5 rounded pointer-events-none whitespace-nowrap shadow-lg">
+            {ann.label}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function StepsTab({ steps, videoUrl, frames = [], annotations = [] }: Props) {
+  const [lightbox, setLightbox] = useState<{src: string, annotations?: Array<{label: string, x: number, y: number}>} | null>(null);
 
   if (steps.length === 0) {
     return (
@@ -45,6 +79,11 @@ export function StepsTab({ steps, videoUrl, frames = [] }: Props) {
           step.frameIndex >= 0 &&
           step.frameIndex < frames.length;
         const frameSrc = hasFrame ? `data:image/jpeg;base64,${frames[step.frameIndex!]}` : null;
+        
+        // Find annotations for this specific frame
+        const stepAnnotations = hasFrame 
+          ? annotations?.find(a => a.frameIndex === step.frameIndex)?.parts 
+          : undefined;
 
         return (
           <div key={step.step} className="flex gap-4 p-4 bg-white border border-gray-200 rounded-lg break-inside-avoid">
@@ -71,16 +110,15 @@ export function StepsTab({ steps, videoUrl, frames = [] }: Props) {
                 {frameSrc && (
                   <button
                     type="button"
-                    onClick={() => setLightbox(frameSrc)}
-                    className="shrink-0 print:hidden"
+                    onClick={() => setLightbox({ src: frameSrc, annotations: stepAnnotations })}
+                    className="shrink-0 print:hidden outline-none"
                     title="Click to enlarge"
                   >
-                    {/* Using <img> intentionally — base64 data URLs aren't compatible with next/image */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={frameSrc}
+                    <FrameWithAnnotations 
+                      src={frameSrc} 
                       alt={`Frame for step ${step.step}`}
-                      className="w-32 h-20 object-cover rounded border border-gray-200 hover:border-orange-400 transition-colors cursor-zoom-in"
+                      className="w-32 h-20 rounded overflow-hidden border border-gray-200 hover:border-orange-400 transition-colors cursor-zoom-in group/frame block"
+                      annotations={stepAnnotations}
                     />
                   </button>
                 )}
@@ -108,12 +146,20 @@ export function StepsTab({ steps, videoUrl, frames = [] }: Props) {
           className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 cursor-zoom-out"
           onClick={() => setLightbox(null)}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={lightbox}
-            alt="Step frame"
-            className="max-w-full max-h-full rounded-lg shadow-2xl"
-          />
+          <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
+            <FrameWithAnnotations
+              src={lightbox.src}
+              alt="Step frame expanded"
+              className="max-w-[90vw] max-h-[90vh] rounded-lg shadow-2xl overflow-hidden cursor-auto"
+              annotations={lightbox.annotations}
+            />
+            <button 
+              className="absolute -top-4 -right-4 bg-white text-gray-900 rounded-full w-8 h-8 flex items-center justify-center font-bold shadow-lg hover:bg-gray-100 z-10"
+              onClick={() => setLightbox(null)}
+            >
+              ✕
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -54,6 +54,14 @@ export interface RepairGuide {
   warnings: string[];
   diagram: string;
   partsDiagram?: string;
+  frameAnnotations?: Array<{
+    frameIndex: number;
+    parts: Array<{
+      label: string;
+      x: number; // percentage from left
+      y: number; // percentage from top
+    }>;
+  }>;
 }
 
 export interface AnalyzeRequest {

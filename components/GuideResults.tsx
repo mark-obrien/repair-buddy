@@ -92,7 +92,7 @@ export function GuideResults({ guide, frames = [] }: Props) {
             <ToolsTab standardTools={guide.standardTools} specialtyTools={guide.specialtyTools} />
           )}
           {activeTab === 'torque' && <TorqueTab torqueValues={guide.torqueValues} />}
-          {activeTab === 'steps' && <StepsTab steps={guide.repairSteps} videoUrl={guide.videoUrl} frames={frames} />}
+          {activeTab === 'steps' && <StepsTab steps={guide.repairSteps} videoUrl={guide.videoUrl} frames={frames} annotations={guide.frameAnnotations} />}
           {activeTab === 'warnings' && <WarningsTab warnings={guide.warnings} />}
           {activeTab === 'shopping' && <ShoppingTab parts={guide.partsNeeded} vehicleInfo={guide.vehicleInfo} />}
           {activeTab === 'parts-diagram' && <PartsDiagramTab partsDiagram={guide.partsDiagram} />}
@@ -127,7 +127,7 @@ export function GuideResults({ guide, frames = [] }: Props) {
           )}
           <section>
             <h2 className="text-xl font-bold mb-3 print:text-black">Steps</h2>
-            <StepsTab steps={guide.repairSteps} videoUrl={guide.videoUrl} frames={frames} />
+            <StepsTab steps={guide.repairSteps} videoUrl={guide.videoUrl} frames={frames} annotations={guide.frameAnnotations} />
           </section>
         </div>
       </div>

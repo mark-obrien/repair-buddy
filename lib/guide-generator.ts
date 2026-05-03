@@ -89,6 +89,15 @@ const repairGuideSchema = z.object({
   partsDiagram: z.string().optional().catch(undefined).describe(
     'Complete self-contained SVG schematic. Root: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">. White background rect first. Title at top. Components in center region. Legend box bottom-right. No scripts, no external refs.'
   ),
+
+  frameAnnotations: z.array(z.object({
+    frameIndex: z.number(),
+    parts: z.array(z.object({
+      label: z.string(),
+      x: z.number().describe('Percentage (0-100) from left edge'),
+      y: z.number().describe('Percentage (0-100) from top edge'),
+    }))
+  })).catch([]).describe('Bounding box coordinates to overlay part labels on video frames.'),
 });
 
 // ---------------------------------------------------------------------------
@@ -117,6 +126,8 @@ TORQUE VALUES: Extract every torque specification precisely as stated — never 
 REPAIR STEPS: Extract 8-20 logical, actionable steps covering the full procedure. Include step-specific warnings inline. The transcript contains [MM:SS] timestamp markers every ~10 seconds — for each step, find the [MM:SS] marker that immediately precedes the relevant transcript text, convert it to total seconds (MM*60+SS), and set that as timestampSeconds. Be precise: do not round to the nearest 30 or 60 seconds. If the step spans multiple markers, use the marker where the step's key action begins.
 
 FRAME INDEXING: When video frames are provided, you will see them attached as images in chronological order, indexed 0..N-1, evenly spaced from ~10% to ~85% of the video duration. For each repair step, set frameIndex to the index (0-based) of the frame that BEST illustrates that step visually. Pick the most informative frame, not necessarily the chronologically closest. If no provided frame clearly illustrates a step, omit frameIndex for that step. Do NOT invent a frameIndex outside the range of provided frames.
+
+FRAME ANNOTATIONS: For any provided video frame that clearly shows key parts or tools, generate an entry in frameAnnotations identifying the components visible. Set frameIndex to the frame's index, and for each identifiable part, return its label and its approximate X and Y coordinates (as a percentage from 0 to 100) from the top-left corner. E.g., x: 50, y: 50 is the dead center of the frame. Point exactly to where the part sits in the frame.
 
 WARNINGS: Extract all safety warnings, common mistakes, and "gotchas."
 
