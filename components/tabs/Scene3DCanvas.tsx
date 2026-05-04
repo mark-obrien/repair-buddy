@@ -1,8 +1,9 @@
 'use client';
 
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Html } from '@react-three/drei';
-import { useRef, useState } from 'react';
+import { OrbitControls } from '@react-three/drei';
+import { useRef, useState, Component } from 'react';
+import type { ReactNode } from 'react';
 import * as THREE from 'three';
 import type { Scene3D, SceneComponent } from '@/lib/types';
 
@@ -87,31 +88,31 @@ function ComponentMesh({
           opacity={comp.category === 'seal' ? 0.82 : 1}
         />
       </mesh>
-
-      {/* Floating name label */}
-      <Html
-        center
-        distanceFactor={13}
-        position={[0, h / 2 + 0.5, 0]}
-        zIndexRange={[0, 10]}
-        style={{ pointerEvents: 'none' }}
-      >
-        <span style={{
-          background: selected ? '#f97316' : 'rgba(3,7,18,0.78)',
-          color: '#fff',
-          padding: '1px 7px',
-          borderRadius: 4,
-          fontSize: 11,
-          fontFamily: 'system-ui, sans-serif',
-          whiteSpace: 'nowrap',
-          display: 'block',
-          backdropFilter: 'blur(2px)',
-        }}>
-          {comp.name}
-        </span>
-      </Html>
     </group>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Error boundary — catches WebGL / R3F reconciler errors gracefully
+// ---------------------------------------------------------------------------
+
+interface EBState { error: Error | null }
+class CanvasErrorBoundary extends Component<{ children: ReactNode }, EBState> {
+  state: EBState = { error: null };
+  static getDerivedStateFromError(error: Error): EBState { return { error }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex items-center justify-center h-full bg-gray-950 text-gray-400 text-sm p-6 text-center">
+          <div>
+            <p className="font-semibold text-gray-300 mb-1">3D view unavailable</p>
+            <p className="text-xs">{this.state.error.message || 'WebGL may not be supported in this browser.'}</p>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -173,32 +174,34 @@ export function Scene3DCanvas({ scene }: Props) {
 
         {/* Three.js canvas */}
         <div className="flex-1 min-w-0 bg-gray-950">
-          <Canvas
-            shadows
-            camera={{ position: [12, 9, 12], fov: 45 }}
-            style={{ width: '100%', height: '100%' }}
-          >
-            <color attach="background" args={['#030712']} />
+          <CanvasErrorBoundary>
+            <Canvas
+              shadows
+              camera={{ position: [12, 9, 12], fov: 45 }}
+              style={{ width: '100%', height: '100%' }}
+            >
+              <color attach="background" args={['#030712']} />
 
-            <ambientLight intensity={0.55} />
-            <directionalLight position={[10, 14, 8]} intensity={1.3} castShadow shadow-mapSize={[1024, 1024]} />
-            <directionalLight position={[-8, 4, -6]} intensity={0.35} />
+              <ambientLight intensity={0.55} />
+              <directionalLight position={[10, 14, 8]} intensity={1.3} castShadow shadow-mapSize={[1024, 1024]} />
+              <directionalLight position={[-8, 4, -6]} intensity={0.35} />
 
-            {scene.components.map((comp) => (
-              <ComponentMesh
-                key={comp.id}
-                comp={comp}
-                exploded={exploded}
-                selected={selectedId === comp.id}
-                onSelect={handleSelect}
-              />
-            ))}
+              {scene.components.map((comp) => (
+                <ComponentMesh
+                  key={comp.id}
+                  comp={comp}
+                  exploded={exploded}
+                  selected={selectedId === comp.id}
+                  onSelect={handleSelect}
+                />
+              ))}
 
-            {/* Floor grid */}
-            <gridHelper args={[30, 30, '#1f2937', '#111827']} position={[0, -0.02, 0]} />
+              {/* Floor grid */}
+              <gridHelper args={[30, 30, '#1f2937', '#111827']} position={[0, -0.02, 0]} />
 
-            <OrbitControls makeDefault minDistance={3} maxDistance={50} />
-          </Canvas>
+              <OrbitControls makeDefault minDistance={3} maxDistance={50} />
+            </Canvas>
+          </CanvasErrorBoundary>
         </div>
 
         {/* Side panel: component list + selected info */}
