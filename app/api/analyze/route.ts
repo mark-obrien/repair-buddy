@@ -130,7 +130,8 @@ export async function POST(request: Request) {
       researchContext,
       commentsContext,
       provider,
-      model
+      model,
+      durationSeconds
     );
 
     const responsePayload = {

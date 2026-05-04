@@ -166,6 +166,14 @@ IMPORTANT RULES:
 // ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
+function secondsToHms(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = Math.floor(totalSeconds % 60);
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 export async function generateRepairGuide(
   transcript: string,
   videoTitle: string,
@@ -175,7 +183,8 @@ export async function generateRepairGuide(
   researchContext: string = '',
   commentsContext: string = '',
   providerId: string = 'anthropic',
-  modelId: string = 'claude-sonnet-4-6'
+  modelId: string = 'claude-sonnet-4-6',
+  durationSeconds: number = 0
 ): Promise<RepairGuide> {
   const model = getModel(providerId, modelId);
 
@@ -191,7 +200,11 @@ export async function generateRepairGuide(
     ? `\n\nVIEWER COMMENTS (top-rated, may contain corrections or model-year notes):\n${commentsContext}`
     : '';
 
-  const userText = `VIDEO TITLE: ${videoTitle}\nVIDEO URL: ${videoUrl}${researchNote}${commentsNote}${frameNote}\n\nTRANSCRIPT:\n${transcript}`;
+  const durationNote = durationSeconds > 0
+    ? `\nVIDEO DURATION: ${secondsToHms(durationSeconds)} (${Math.round(durationSeconds)}s) — timestamps MUST be within this range.`
+    : '';
+
+  const userText = `VIDEO TITLE: ${videoTitle}\nVIDEO URL: ${videoUrl}${durationNote}${researchNote}${commentsNote}${frameNote}\n\nTRANSCRIPT:\n${transcript}`;
 
   const result = await generateText({
     model,
@@ -244,6 +257,11 @@ export async function generateRepairGuide(
         delete step.timestamp;
       }
       
+      // Clamp timestamps beyond the video's actual duration to undefined
+      if (step.timestampSeconds != null && durationSeconds > 0 && step.timestampSeconds > durationSeconds) {
+        step.timestampSeconds = undefined;
+      }
+
       // Defensive: clamp any out-of-range frameIndex values to undefined
       if (step.frameIndex != null && frames.length > 0) {
         if (step.frameIndex < 0 || step.frameIndex >= frames.length) {

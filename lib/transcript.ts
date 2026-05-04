@@ -29,15 +29,31 @@ function formatTimestamp(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+// The youtube-transcript package has two code paths:
+//   - Classic XML format (<text start="s" dur="s">) → offset in seconds
+//   - New timedtext/json3 format → offset in milliseconds (named startMs in source)
+// Detect by checking whether the gap between the first two items looks like
+// milliseconds (> 100) vs seconds (≤ 100). A 100-second silence before the
+// second word is effectively impossible in a repair video.
+function normalizeOffsets(items: Array<{ text: string; offset: number }>): Array<{ text: string; offset: number }> {
+  if (items.length < 2) return items;
+  const looksLikeMs = items[1].offset > 100;
+  if (looksLikeMs) {
+    return items.map((item) => ({ ...item, offset: item.offset / 1000 }));
+  }
+  return items;
+}
+
 function formatTranscript(items: Array<{ text: string; offset: number }>): TranscriptResult {
   if (items.length === 0) return { text: '', durationSeconds: 0 };
 
+  const normalized = normalizeOffsets(items);
   const chunks: string[] = [];
   let currentChunkText: string[] = [];
-  let currentChunkStart = items[0].offset;
+  let currentChunkStart = normalized[0].offset;
   const CHUNK_SECONDS = 10;
 
-  for (const item of items) {
+  for (const item of normalized) {
     if (item.offset - currentChunkStart >= CHUNK_SECONDS && currentChunkText.length > 0) {
       chunks.push(`[${formatTimestamp(currentChunkStart)}] ${currentChunkText.join(' ')}`);
       currentChunkText = [];
@@ -50,7 +66,7 @@ function formatTranscript(items: Array<{ text: string; offset: number }>): Trans
     chunks.push(`[${formatTimestamp(currentChunkStart)}] ${currentChunkText.join(' ')}`);
   }
 
-  const last = items[items.length - 1];
+  const last = normalized[normalized.length - 1];
   return {
     text: chunks.join('\n\n'),
     durationSeconds: Math.ceil(last.offset),
