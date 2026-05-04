@@ -2,7 +2,7 @@ import ytdl from '@distube/ytdl-core';
 import ffmpeg from 'fluent-ffmpeg';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { mkdtemp, readFile, unlink, rm } from 'fs/promises';
+import { mkdtemp, readdir, readFile, unlink, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import type { Readable } from 'stream';
@@ -46,26 +46,43 @@ function getFrameTimestamps(durationSeconds: number, count: number): number[] {
 }
 
 // ---------------------------------------------------------------------------
-// yt-dlp: get a direct video stream URL (preferred)
+// yt-dlp: download video to a local temp file (preferred)
+//
+// Why download instead of using --get-url:
+//   YouTube's direct stream URLs embed time-limited auth tokens and require
+//   specific HTTP headers (User-Agent, cookies) that yt-dlp sets automatically
+//   but ffmpeg doesn't. Downloading through yt-dlp avoids all of that.
 // ---------------------------------------------------------------------------
 
-async function getVideoUrlWithYtDlp(videoUrl: string): Promise<string> {
+async function downloadVideoWithYtDlp(
+  videoUrl: string,
+  tempDir: string
+): Promise<string> {
   const ytdlpBin = process.env.YTDLP_PATH ?? 'yt-dlp';
-  const args = [
-    '-f', 'bestvideo[height<=480][ext=mp4]/bestvideo[height<=480]/bestvideo/best[height<=480]/best',
-    '--get-url',
-    '--no-playlist',
-    videoUrl,
-  ];
+  const outputTemplate = join(tempDir, 'video.%(ext)s');
 
-  const { stdout } = await execFileAsync(ytdlpBin, args, { timeout: 30_000 });
-  const url = stdout.trim().split('\n')[0];
-  if (!url) throw new FrameExtractionError('yt-dlp returned no stream URL');
-  return url;
+  // Lowest-quality video-only stream to minimise download size/time.
+  // 144p/240p is plenty for frame thumbnails.
+  await execFileAsync(
+    ytdlpBin,
+    [
+      '-f', 'worstvideo[ext=mp4]/bestvideo[height<=240][ext=mp4]/worst[ext=mp4]/worst',
+      '--no-playlist',
+      '--quiet',
+      '-o', outputTemplate,
+      videoUrl,
+    ],
+    { timeout: 180_000 }
+  );
+
+  const files = await readdir(tempDir);
+  const videoFile = files.find((f) => f.startsWith('video.'));
+  if (!videoFile) throw new FrameExtractionError('yt-dlp did not produce a video file.');
+  return join(tempDir, videoFile);
 }
 
 // ---------------------------------------------------------------------------
-// ytdl-core: get a direct video stream URL (fallback)
+// ytdl-core: fallback when yt-dlp is absent (returns a stream URL)
 // ---------------------------------------------------------------------------
 
 async function getVideoUrlWithYtdlCore(videoUrl: string): Promise<string> {
@@ -73,23 +90,6 @@ async function getVideoUrlWithYtdlCore(videoUrl: string): Promise<string> {
   const format = ytdl.chooseFormat(info.formats, { quality: 'lowestvideo' });
   if (!format?.url) throw new FrameExtractionError('No usable video stream found.');
   return format.url;
-}
-
-// ---------------------------------------------------------------------------
-// Unified URL fetch: yt-dlp first, ytdl-core if yt-dlp is absent
-// ---------------------------------------------------------------------------
-
-async function getVideoStreamUrl(videoUrl: string): Promise<string> {
-  try {
-    return await getVideoUrlWithYtDlp(videoUrl);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : '';
-    if (msg.includes('ENOENT') || msg.toLowerCase().includes('not found')) {
-      console.warn('yt-dlp not found, falling back to ytdl-core for frame extraction');
-      return getVideoUrlWithYtdlCore(videoUrl);
-    }
-    throw err;
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -108,9 +108,24 @@ export async function extractVideoFrames(
   const tempDir = await mkdtemp(join(tmpdir(), 'repairbuddy-frames-'));
 
   try {
-    const streamUrl = await getVideoStreamUrl(videoUrl);
+    let videoInput: string;
+
+    try {
+      // yt-dlp downloads to a local file — auth tokens and headers handled internally
+      videoInput = await downloadVideoWithYtDlp(videoUrl, tempDir);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.includes('ENOENT') || msg.toLowerCase().includes('not found')) {
+        // yt-dlp not installed — fall back to ytdl-core stream URL
+        console.warn('yt-dlp not found, falling back to ytdl-core for frame extraction');
+        videoInput = await getVideoUrlWithYtdlCore(videoUrl);
+      } else {
+        throw err;
+      }
+    }
+
     const framePromises = timestamps.map((seconds, i) =>
-      extractSingleFrame(streamUrl, seconds, tempDir, i)
+      extractSingleFrame(videoInput, seconds, tempDir, i)
     );
     const frames = await Promise.all(framePromises);
     const validFrames = frames.filter((f): f is string => f !== null);
@@ -127,7 +142,7 @@ export async function extractVideoFrames(
 }
 
 async function extractSingleFrame(
-  videoStreamUrl: string,
+  videoInput: string,
   timestampSeconds: number,
   tempDir: string,
   index: number
@@ -135,7 +150,7 @@ async function extractSingleFrame(
   const framePath = join(tempDir, `frame-${index}.jpg`);
 
   return new Promise((resolve) => {
-    ffmpeg(videoStreamUrl)
+    ffmpeg(videoInput)
       .seekInput(timestampSeconds)
       .frames(1)
       .size(`${FRAME_WIDTH}x?`)
