@@ -12,15 +12,18 @@ import { DiagramTab } from '@/components/tabs/DiagramTab';
 import { PartsDiagramTab } from '@/components/tabs/PartsDiagramTab';
 import { ShoppingTab } from '@/components/tabs/ShoppingTab';
 import { VideoGuideView } from '@/components/VideoGuideView';
+import { Scene3DTab } from '@/components/tabs/Scene3DTab';
 
 interface Props {
   guide: RepairGuide;
   frames?: string[];
+  provider?: string;
+  model?: string;
 }
 
-type TabId = 'watch' | 'overview' | 'parts' | 'tools' | 'torque' | 'steps' | 'warnings' | 'diagram' | 'parts-diagram' | 'shopping';
+type TabId = 'watch' | 'overview' | 'parts' | 'tools' | 'torque' | 'steps' | 'warnings' | 'diagram' | 'parts-diagram' | 'shopping' | '3d';
 
-export function GuideResults({ guide, frames = [] }: Props) {
+export function GuideResults({ guide, frames = [], provider = 'anthropic', model = 'claude-sonnet-4-6' }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('overview');
 
   const toolCount = guide.standardTools.length + guide.specialtyTools.length;
@@ -36,6 +39,7 @@ export function GuideResults({ guide, frames = [] }: Props) {
     { id: 'shopping', label: 'Shop', count: guide.partsNeeded.length },
     { id: 'parts-diagram', label: 'Parts Diagram' },
     { id: 'diagram', label: 'Process Flow' },
+    { id: '3d', label: '3D View' },
   ];
 
   return (
@@ -77,12 +81,15 @@ export function GuideResults({ guide, frames = [] }: Props) {
         </nav>
       </div>
 
-      {/* Watch tab renders edge-to-edge without the p-5 wrapper */}
+      {/* Watch and 3D tabs render edge-to-edge without the p-5 wrapper */}
       {activeTab === 'watch' && (
         <VideoGuideView guide={guide} frames={frames} />
       )}
+      {activeTab === '3d' && (
+        <Scene3DTab guide={guide} frames={frames} provider={provider} model={model} />
+      )}
 
-      {activeTab !== 'watch' && (
+      {activeTab !== 'watch' && activeTab !== '3d' && (
       <div className="p-5">
         {/* Screen view: only the active tab */}
         <div className="screen-view">

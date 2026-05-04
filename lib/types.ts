@@ -76,8 +76,32 @@ export interface AnalyzeResponse {
 }
 
 // ---------------------------------------------------------------------------
-// My Garage (client-side localStorage)
+// 3D Scene (AI-generated exploded-view schematic)
 // ---------------------------------------------------------------------------
+export interface SceneComponent {
+  id: string;
+  name: string;
+  shape: 'box' | 'cylinder' | 'sphere' | 'cone' | 'torus';
+  width: number;
+  height: number;
+  depth: number;
+  x: number;
+  y: number;
+  z: number;
+  rotX: number;
+  rotY: number;
+  rotZ: number;
+  color: string;
+  category: 'primary' | 'structural' | 'fastener' | 'seal' | 'sensor' | 'fluid' | 'rotating';
+  description?: string;
+}
+
+export interface Scene3D {
+  title: string;
+  components: SceneComponent[];
+}
+
+
 export interface SavedVehicle {
   id: string;          // uuid
   nickname?: string;   // "My daily driver"

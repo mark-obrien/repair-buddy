@@ -161,7 +161,7 @@ export default function Home() {
             </div>
 
             {/* key forces remount of guide results when garage changes so the banner re-evaluates */}
-            <GuideResults key={garageVersion} guide={guide} frames={frames} />
+            <GuideResults key={garageVersion} guide={guide} frames={frames} provider={meta.provider} model={meta.model} />
           </>
         )}
 
