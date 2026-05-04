@@ -13,17 +13,22 @@ interface Props {
 function buildTimestampUrl(videoUrl: string, seconds: number): string {
   try {
     const url = new URL(videoUrl);
-    url.searchParams.set('t', String(seconds));
+    url.searchParams.set('t', String(Math.floor(seconds)));
     return url.toString();
   } catch {
     return videoUrl;
   }
 }
 
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
+function formatTime(totalSeconds: number): string {
+  const s = Math.floor(totalSeconds);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  }
+  return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
 function FrameWithAnnotations({ 
