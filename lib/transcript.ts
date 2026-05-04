@@ -1,4 +1,10 @@
-import { YoutubeTranscript } from 'youtube-transcript';
+import {
+  YoutubeTranscript,
+  YoutubeTranscriptDisabledError,
+  YoutubeTranscriptNotAvailableError,
+  YoutubeTranscriptVideoUnavailableError,
+  YoutubeTranscriptTooManyRequestError,
+} from 'youtube-transcript';
 import { transcribeWithWhisper, SpeechToTextError } from './speech-to-text';
 import { getCachedTranscript, cacheTranscript } from './cache';
 
@@ -81,15 +87,18 @@ async function fetchYoutubeTranscript(videoId: string): Promise<TranscriptResult
     }
     return formatTranscript(items.map((i) => ({ text: i.text, offset: i.offset })));
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes('429') || msg.toLowerCase().includes('rate') || msg.toLowerCase().includes('too many')) {
+    if (err instanceof TranscriptUnavailableError) throw err;
+    if (err instanceof YoutubeTranscriptTooManyRequestError) {
       throw new TranscriptRateLimitError('YouTube is rate-limiting transcript requests. Please try again in a few minutes.');
     }
-    if (msg.toLowerCase().includes('disabled') || msg.toLowerCase().includes('unavailable') ||
-        msg.toLowerCase().includes('no transcript') || msg.toLowerCase().includes('captions')) {
-      throw new TranscriptUnavailableError(msg);
+    if (err instanceof YoutubeTranscriptVideoUnavailableError) {
+      throw new TranscriptUnavailableError('This video is unavailable or private.');
     }
-    throw new TranscriptUnavailableError(`Failed to fetch transcript: ${msg}`);
+    if (err instanceof YoutubeTranscriptDisabledError || err instanceof YoutubeTranscriptNotAvailableError) {
+      throw new TranscriptUnavailableError('NO_CAPTIONS');
+    }
+    // Fallback for unexpected errors — still attempt Whisper
+    throw new TranscriptUnavailableError('NO_CAPTIONS');
   }
 }
 
@@ -111,13 +120,19 @@ export async function fetchAndFormatTranscript(videoId: string): Promise<Transcr
   } catch (err) {
     if (err instanceof TranscriptRateLimitError) throw err;
     if (err instanceof TranscriptUnavailableError) {
+      if (!process.env.OPENAI_API_KEY) {
+        throw new TranscriptUnavailableError(
+          'This video has no captions. Add an OPENAI_API_KEY to your environment to enable automatic Whisper transcription for videos without subtitles.'
+        );
+      }
       // Try Whisper fallback
       try {
+        console.log(`No YouTube captions — attempting Whisper transcription for ${videoId}`);
         result = await transcribeWithWhisper(videoId);
       } catch (whisperErr) {
-        if (whisperErr instanceof SpeechToTextError) throw whisperErr;
+        const reason = whisperErr instanceof Error ? whisperErr.message : String(whisperErr);
         throw new TranscriptUnavailableError(
-          'No captions available and Whisper transcription failed. Try a different video.'
+          `This video has no captions and Whisper transcription failed: ${reason}`
         );
       }
     } else {

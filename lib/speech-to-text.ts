@@ -44,7 +44,6 @@ async function downloadAudioWithYtDlp(
       '--audio-quality', '48K',
       '--no-playlist',
       '--no-progress',
-      '--quiet',
     ];
 
     // Tell yt-dlp where ffmpeg lives if we have a custom path
@@ -137,10 +136,6 @@ async function downloadAndExtractAudio(
 // ---------------------------------------------------------------------------
 
 export async function transcribeWithWhisper(videoId: string): Promise<TranscriptResult> {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new SpeechToTextError('Whisper fallback requires OPENAI_API_KEY in .env.local.');
-  }
-
   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
   let audioPath: string | null = null;
 
