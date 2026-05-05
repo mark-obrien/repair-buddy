@@ -4,9 +4,12 @@ interface Props {
 
 export function ErrorAlert({ message }: Props) {
   return (
-    <div className="flex gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
-      <span className="text-lg shrink-0">⚠️</span>
-      <p className="text-sm">{message}</p>
+    <div className="flex gap-3 p-4 bg-error/5 border border-error/20 rounded-lg text-error">
+      <span className="material-symbols-outlined text-lg shrink-0">error</span>
+      <div>
+        <p className="text-label-caps font-bold uppercase mb-1">Error</p>
+        <p className="text-sm text-on-surface-variant">{message}</p>
+      </div>
     </div>
   );
 }

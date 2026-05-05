@@ -110,32 +110,34 @@ export function TorqueTab({ torqueValues }: Props) {
 
   if (torqueValues.length === 0) {
     return (
-      <div className="text-center py-10 text-gray-400">
-        <div className="text-4xl mb-2">⚙️</div>
-        <p className="text-sm">No torque specifications were mentioned in this video.</p>
+      <div className="text-center py-10 text-on-surface-variant">
+        <span className="material-symbols-outlined text-4xl mb-2 block text-outline">settings</span>
+        <p className="text-sm uppercase font-bold text-outline">No torque specifications were mentioned in this video.</p>
       </div>
     );
   }
 
   return (
     <div>
-      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg p-3 mb-4 flex gap-2">
-        <span className="shrink-0">⚠️</span>
-        Always verify torque values against your vehicle&apos;s service manual. These are extracted from the video and may not cover all applications.
-      </p>
+      <div className="flex gap-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-3 mb-4">
+        <span className="material-symbols-outlined text-amber-600 text-sm shrink-0">warning</span>
+        <p className="uppercase font-bold leading-relaxed">
+          Always verify torque values against your vehicle&apos;s service manual. These are extracted from the video and may not cover all applications.
+        </p>
+      </div>
 
       {/* Unit toggle */}
-      <div className="flex flex-wrap items-center gap-2 mb-3 print:hidden">
-        <span className="text-xs text-gray-500 font-medium">Display in:</span>
-        <div className="flex flex-wrap rounded-md border border-gray-200 overflow-hidden text-xs">
+      <div className="flex flex-wrap items-center gap-3 mb-4 print:hidden">
+        <span className="text-label-caps text-on-surface-variant uppercase">Display in:</span>
+        <div className="flex rounded border border-surface-container-highest overflow-hidden text-xs">
           {UNIT_OPTIONS.map((opt) => (
             <button
               key={opt.id}
               onClick={() => setUnit(opt.id)}
-              className={`px-3 py-1.5 transition-colors ${
+              className={`px-3 py-1.5 font-bold uppercase transition-colors text-label-caps ${
                 unit === opt.id
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
+                  ? 'bg-primary text-on-primary'
+                  : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low'
               }`}
             >
               {opt.label}
@@ -144,34 +146,34 @@ export function TorqueTab({ torqueValues }: Props) {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto rounded-lg border border-surface-container-highest shadow-ambient">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200 text-left">
-              <th className="pb-2 pr-4 font-semibold text-gray-700">Component</th>
-              <th className="pb-2 pr-4 font-semibold text-gray-700 text-right">Value</th>
-              <th className="pb-2 pr-4 font-semibold text-gray-700">Unit</th>
-              <th className="pb-2 font-semibold text-gray-700">Notes</th>
+            <tr className="border-b border-surface-container-highest bg-surface-container-low text-left">
+              <th className="px-4 py-3 text-label-caps text-outline uppercase font-bold">Component</th>
+              <th className="px-4 py-3 text-label-caps text-outline uppercase font-bold text-right">Value</th>
+              <th className="px-4 py-3 text-label-caps text-outline uppercase font-bold">Unit</th>
+              <th className="px-4 py-3 text-label-caps text-outline uppercase font-bold">Notes</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-surface-container-highest">
             {rows.map((tv, i) => (
-              <tr key={i} className="hover:bg-gray-50">
-                <td className="py-2.5 pr-4 font-medium text-gray-900">{tv.component}</td>
-                <td className="py-2.5 pr-4 text-right">
-                  <span className="text-orange-600 font-bold font-mono">{tv.displayValue}</span>
+              <tr key={i} className="hover:bg-surface-container-low transition-colors">
+                <td className="px-4 py-3 font-bold text-on-surface uppercase text-xs tracking-tight">{tv.component}</td>
+                <td className="px-4 py-3 text-right">
+                  <span className="text-primary font-bold font-mono text-lg">{tv.displayValue}</span>
                 </td>
-                <td className="py-2.5 pr-4">
-                  <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">
+                <td className="px-4 py-3">
+                  <span className="text-[10px] bg-primary-fixed text-primary px-2 py-0.5 rounded font-bold uppercase">
                     {tv.displayUnit}
                   </span>
                   {unit !== 'native' && tv.unit !== unit && (
-                    <span className="text-xs text-gray-400 ml-1.5">
-                      (orig {tv.value} {tv.unit})
+                    <span className="text-[10px] text-outline ml-2 font-mono">
+                      ({tv.value} {tv.unit})
                     </span>
                   )}
                 </td>
-                <td className="py-2.5 text-gray-500 text-xs">{tv.notes ?? ''}</td>
+                <td className="px-4 py-3 text-on-surface-variant text-xs">{tv.notes ?? ''}</td>
               </tr>
             ))}
           </tbody>

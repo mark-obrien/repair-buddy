@@ -3,9 +3,51 @@
 @tailwind utilities;
 
 body {
-  background: #f9fafb;
-  color: #111827;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f7f9fb;
+  color: #191c1e;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Material Symbols weight */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Tread-line connector between step cards */
+.tread-line::before {
+  content: '';
+  position: absolute;
+  left: 19px;
+  top: 40px;
+  bottom: -20px;
+  width: 2px;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 4px,
+    #e0e3e5 4px,
+    #e0e3e5 8px
+  );
+}
+.tread-line-last::before {
+  display: none;
+}
+
+/* Hide scrollbar but keep scroll functionality */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Label caps utility */
+.text-label-caps {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1;
 }
 
 /* ---------------------------------------------------------------------------
@@ -16,20 +58,19 @@ body {
     background: white;
   }
 
-  /* Hide chrome and screen-only elements */
   header,
-  .print\:hidden,
-  nav {
+  nav,
+  aside,
+  .print\:hidden {
     display: none !important;
   }
 
   main {
     max-width: 100% !important;
     padding: 0 !important;
+    margin-left: 0 !important;
   }
 
-  /* The "screen view" is the active-tab single panel; we hide it and show the
-     print view that renders every section sequentially. */
   .screen-view {
     display: none !important;
   }
@@ -43,13 +84,11 @@ body {
     border-radius: 0 !important;
   }
 
-  /* Print-friendly page setup */
   @page {
     margin: 0.6in;
     size: letter;
   }
 
-  /* Avoid awkward page breaks inside critical blocks */
   .break-inside-avoid {
     break-inside: avoid;
     page-break-inside: avoid;
@@ -61,25 +100,21 @@ body {
     page-break-after: avoid;
   }
 
-  /* Backgrounds + colors print accurately */
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  /* Thumbnails in step view — print smaller and inline rather than as buttons */
   .print-view img {
     max-width: 200px !important;
     max-height: 150px !important;
   }
 
-  /* Table widths — print uses available space */
   table {
     width: 100% !important;
     font-size: 11pt !important;
   }
 
-  /* Step cards a bit denser in print */
   .print-view section {
     margin-bottom: 1rem;
   }

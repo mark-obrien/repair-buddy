@@ -176,43 +176,38 @@ export function VideoGuideView({ guide, frames = [] }: Props) {
     <div className="flex flex-col md:grid md:grid-cols-[1fr_300px] lg:grid-cols-[1fr_360px]">
 
       {/* ── Video column ───────────────────────────────────────── */}
-      <div className="bg-black">
+      <div className="bg-on-background">
         <div className="relative w-full aspect-video">
           <div id="yt-player-host" className="absolute inset-0 w-full h-full" />
         </div>
 
         {/* Active step pill — only visible on narrow screens below the video */}
         {activeStep && (
-          <div className="flex items-center gap-2 px-3 py-2 bg-zinc-900 border-t border-zinc-700 md:hidden">
-            <div className="shrink-0 w-5 h-5 rounded-full bg-orange-500 text-white flex items-center justify-center text-xs font-bold">
+          <div className="flex items-center gap-2 px-3 py-2 bg-inverse-surface border-t border-outline/30 md:hidden">
+            <div className="shrink-0 w-6 h-6 rounded bg-primary text-on-primary flex items-center justify-center text-xs font-bold font-mono">
               {activeStep.step}
             </div>
-            <p className="text-xs font-semibold text-orange-100 truncate">{activeStep.title}</p>
+            <p className="text-xs font-bold text-inverse-on-surface truncate uppercase tracking-tight">{activeStep.title}</p>
           </div>
         )}
       </div>
 
       {/* ── Steps column ───────────────────────────────────────── */}
-      {/*
-        min-h-0 prevents this grid item from expanding the row beyond the
-        video's aspect-ratio height. flex flex-col + flex-1 on the list
-        makes inner overflow-y work correctly within that constrained height.
-      */}
-      <div className="min-h-0 flex flex-col border-t md:border-t-0 md:border-l border-gray-200">
+      <div className="min-h-0 flex flex-col border-t md:border-t-0 md:border-l border-surface-container-highest">
 
         {/* Column header */}
-        <div className="shrink-0 flex items-center justify-between px-3 py-2.5 bg-gray-50 border-b border-gray-200">
-          <h3 className="text-sm font-semibold text-gray-700">Repair Steps</h3>
+        <div className="shrink-0 flex items-center justify-between px-4 py-3 bg-surface-container-low border-b border-surface-container-highest">
+          <h3 className="text-label-caps text-on-surface uppercase font-bold">Repair Steps</h3>
           {!playerReady && (
-            <span className="text-xs text-gray-400 animate-pulse">Loading player…</span>
+            <span className="text-[10px] text-outline uppercase font-bold animate-pulse">LOADING...</span>
           )}
           {playerReady && !hasTimestamps && (
-            <span className="text-xs text-gray-400">no timestamps</span>
+            <span className="text-[10px] text-outline uppercase font-bold">NO TIMESTAMPS</span>
           )}
         </div>
 
         {/* Scrollable steps list */}
-        <div className="flex-1 overflow-y-auto min-h-0 max-h-[50vh] md:max-h-none">
+        <div className="flex-1 overflow-y-auto no-scrollbar min-h-0 max-h-[50vh] md:max-h-none">
           {guide.repairSteps.map((step, index) => {
             const isActive = index === activeStepIndex;
             const hasTs = step.timestampSeconds != null;
@@ -230,15 +225,19 @@ export function VideoGuideView({ guide, frames = [] }: Props) {
                 ref={(el) => { stepRefs.current[index] = el; }}
                 onClick={() => hasTs && seekToStep(index)}
                 className={[
-                  'flex gap-3 px-3 py-2.5 border-b border-gray-100 transition-all duration-150',
-                  isActive ? 'bg-orange-50 border-l-[3px] border-l-orange-500 pl-[calc(0.75rem_-_3px)]' : 'border-l-[3px] border-l-transparent',
-                  hasTs ? 'cursor-pointer hover:bg-gray-50' : '',
+                  'flex gap-3 px-4 py-3 border-b border-surface-container-highest transition-all duration-150',
+                  isActive
+                    ? 'bg-primary-fixed/40 border-l-2 border-l-primary pl-[calc(1rem_-_2px)]'
+                    : 'border-l-2 border-l-transparent',
+                  hasTs ? 'cursor-pointer hover:bg-surface-container-low' : '',
                 ].join(' ')}
               >
                 {/* Step number badge */}
                 <div
-                  className={`shrink-0 mt-0.5 w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs transition-colors ${
-                    isActive ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-600'
+                  className={`shrink-0 mt-0.5 w-7 h-7 rounded flex items-center justify-center font-bold text-xs font-mono transition-colors ${
+                    isActive
+                      ? 'bg-primary text-on-primary shadow-sm'
+                      : 'bg-surface-container-high text-on-surface-variant border border-surface-container-highest'
                   }`}
                 >
                   {step.step}
@@ -247,11 +246,15 @@ export function VideoGuideView({ guide, frames = [] }: Props) {
                 <div className="flex-1 min-w-0">
                   {/* Title row */}
                   <div className="flex items-start justify-between gap-1 mb-0.5">
-                    <p className={`text-xs font-semibold leading-snug ${isActive ? 'text-orange-900' : 'text-gray-800'}`}>
+                    <p className={`text-xs font-bold uppercase tracking-tight leading-snug ${isActive ? 'text-primary' : 'text-on-surface'}`}>
                       {step.title}
                     </p>
                     {hasTs && (
-                      <span className={`shrink-0 text-xs font-mono tabular-nums ${isActive ? 'text-orange-500 font-semibold' : 'text-gray-400'}`}>
+                      <span className={`shrink-0 text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded border ${
+                        isActive
+                          ? 'text-primary border-primary/30 bg-primary-fixed/40'
+                          : 'text-outline border-surface-container-highest bg-surface-container-low'
+                      }`}>
                         {formatTime(step.timestampSeconds!)}
                       </span>
                     )}
@@ -260,28 +263,28 @@ export function VideoGuideView({ guide, frames = [] }: Props) {
                   {/* Full description + frame only for the active step */}
                   {isActive ? (
                     <>
-                      <p className="text-xs text-gray-600 leading-relaxed">{step.description}</p>
+                      <p className="text-xs text-on-surface-variant leading-relaxed">{step.description}</p>
                       {frameSrc && (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={frameSrc}
                           alt={`Step ${step.step}`}
-                          className="mt-2 w-full rounded border border-gray-200 object-cover"
+                          className="mt-2 w-full rounded border border-surface-container-highest object-cover"
                         />
                       )}
                       {step.warnings && step.warnings.length > 0 && (
                         <div className="mt-1.5 space-y-1">
                           {step.warnings.map((w, i) => (
-                            <div key={i} className="flex gap-1 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded px-2 py-1">
-                              <span className="shrink-0">⚠️</span>
-                              <span>{w}</span>
+                            <div key={i} className="flex gap-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                              <span className="shrink-0 material-symbols-outlined text-sm">warning</span>
+                              <span className="uppercase font-bold">{w}</span>
                             </div>
                           ))}
                         </div>
                       )}
                     </>
                   ) : (
-                    <p className="text-xs text-gray-400 truncate leading-snug">{step.description}</p>
+                    <p className="text-[11px] text-outline truncate leading-snug">{step.description}</p>
                   )}
                 </div>
               </div>
