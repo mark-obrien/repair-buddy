@@ -200,7 +200,7 @@ export default function Home() {
 
             <div className="bg-surface-container-lowest border border-surface-container-highest rounded-lg shadow-ambient p-6 mb-gutter">
               <p className="text-label-caps text-on-surface-variant mb-4 uppercase">Video URL</p>
-              <UrlInputForm onSubmit={handleSubmit} isLoading={status === 'loading'} />
+              <UrlInputForm onSubmit={handleSubmit} isLoading={false} />
             </div>
 
             {status === 'error' && error && <ErrorAlert message={error} />}
