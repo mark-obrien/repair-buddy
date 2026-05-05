@@ -1,5 +1,6 @@
 import { generateText } from 'ai';
 import { getModel } from './providers';
+import { fetchLemonManuals } from './web-sources';
 
 const RESEARCH_SYSTEM_PROMPT = `You are a master automotive and appliance repair technician with encyclopedic knowledge of repair procedures, specifications, and best practices.
 
@@ -27,20 +28,29 @@ export async function researchRepairTopic(
   const researchModelId = getResearchModel(providerId, modelId);
   const model = getModel(providerId, researchModelId);
 
-  try {
-    const result = await generateText({
+  // Fetch external manual content in parallel with nothing (fire and forget
+  // alongside the AI call below — both resolve independently)
+  const [manualContent, aiResult] = await Promise.all([
+    fetchLemonManuals(videoTitle),
+    generateText({
       model,
       maxTokens: 1500,
       system: RESEARCH_SYSTEM_PROMPT,
       prompt: `Repair video title: "${videoTitle}"\n\nProvide repair background research for this topic.`,
       abortSignal: undefined,
-    });
+    }).catch((err) => {
+      console.warn('Research phase failed:', err instanceof Error ? err.message : err);
+      return null;
+    }),
+  ]);
 
-    return result.text;
-  } catch (err) {
-    console.warn('Research phase failed:', err instanceof Error ? err.message : err);
-    return '';
+  const parts: string[] = [];
+  if (aiResult?.text) parts.push(aiResult.text);
+  if (manualContent) {
+    parts.push(`\n---\nMANUAL SOURCE (lemon-manuals.la):\n${manualContent}`);
+    console.log(`lemon-manuals.la: ${manualContent.length} chars fetched`);
   }
+  return parts.join('\n');
 }
 
 function getResearchModel(providerId: string, selectedModelId: string): string {
