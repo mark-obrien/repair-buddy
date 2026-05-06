@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { RepairGuide } from '@/lib/types';
 import { UrlInputForm } from '@/components/UrlInputForm';
 import { LoadingState } from '@/components/LoadingState';
@@ -27,7 +27,13 @@ interface ResultMeta {
 
 type NavItem = 'dashboard' | 'guides' | 'generator' | 'settings';
 
-export default function Home() {
+export default function Home({
+  params,
+  searchParams,
+}: {
+  params?: { videoId?: string };
+  searchParams?: { p?: string; m?: string };
+} = {}) {
   const [status, setStatus] = useState<Status>('idle');
   const [guide, setGuide] = useState<RepairGuide | null>(null);
   const [frames, setFrames] = useState<string[]>([]);
@@ -36,6 +42,14 @@ export default function Home() {
   const [garageOpen, setGarageOpen] = useState(false);
   const [garageVersion, setGarageVersion] = useState(0);
   const [activeNav, setActiveNav] = useState<NavItem>('generator');
+
+  useEffect(() => {
+    if (params?.videoId && searchParams?.p && searchParams?.m) {
+      const url = `https://www.youtube.com/watch?v=${params.videoId}`;
+      runAnalysis(url, searchParams.p, searchParams.m, false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params?.videoId, searchParams?.p, searchParams?.m]);
 
   async function runAnalysis(url: string, provider: string, model: string, force: boolean) {
     setStatus('loading');

@@ -1,5 +1,5 @@
 FROM node:20-alpine AS deps
-RUN apk add --no-cache libc6-compat python3 make g++
+RUN apk add --no-cache libc6-compat python3 make g++ ffmpeg yt-dlp
 WORKDIR /app
 COPY package*.json ./
 RUN npm install --legacy-peer-deps
