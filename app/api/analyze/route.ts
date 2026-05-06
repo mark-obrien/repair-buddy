@@ -12,6 +12,7 @@ import { researchRepairTopic } from '@/lib/researcher';
 import { fetchTopComments } from '@/lib/comments';
 import { checkProviderKey, DEFAULT_PROVIDER, DEFAULT_MODEL, getModelOption } from '@/lib/providers';
 import { getCachedGuide, cacheGuide } from '@/lib/db';
+import type { RepairCategory } from '@/lib/types';
 
 export const maxDuration = 60;
 export const runtime = 'nodejs';
@@ -36,14 +37,14 @@ async function tryExtractFrames(videoUrl: string, durationSeconds: number): Prom
 }
 
 export async function POST(request: Request) {
-  let body: { url?: string; provider?: string; model?: string; force?: boolean };
+  let body: { url?: string; provider?: string; model?: string; force?: boolean; category?: RepairCategory };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 });
   }
 
-  const { url, provider = DEFAULT_PROVIDER, model = DEFAULT_MODEL, force = false } = body;
+  const { url, provider = DEFAULT_PROVIDER, model = DEFAULT_MODEL, force = false, category = 'auto' } = body;
 
   if (!url?.trim()) {
     return NextResponse.json({ error: 'A YouTube URL is required.' }, { status: 400 });
@@ -110,7 +111,7 @@ export async function POST(request: Request) {
   // Three non-fatal parallel calls: research, frames, comments. Any can fail
   // silently and the guide still generates — they only enhance quality.
   const [researchContext, frames, commentsContext] = await Promise.all([
-    researchRepairTopic(metadata.title, provider, model),
+    researchRepairTopic(metadata.title, provider, model, category),
     useFrames ? tryExtractFrames(url.trim(), durationSeconds) : Promise.resolve([]),
     fetchTopComments(videoId),
   ]);
@@ -131,7 +132,8 @@ export async function POST(request: Request) {
       commentsContext,
       provider,
       model,
-      durationSeconds
+      durationSeconds,
+      category
     );
 
     const responsePayload = {

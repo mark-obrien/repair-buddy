@@ -1,10 +1,9 @@
 'use client';
 interface Props { activeSection?: string; onNewRepair?: () => void; }
-export function ShiftSidebar({ activeSection = 'generator', onNewRepair }: Props) {
+export function ShiftSidebar({ activeSection = 'auto', onNewRepair }: Props) {
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '#' },
-    { id: 'library', label: 'Guide Library', icon: 'menu_book', href: '#' },
-    { id: 'generator', label: 'Generator', icon: 'construction', href: '#' },
+    { id: 'auto', label: 'Auto Repair', icon: 'directions_car', href: '/' },
+    { id: 'home', label: 'Home Repair', icon: 'home_repair_service', href: '/home-repair' },
     { id: 'settings', label: 'Settings', icon: 'settings', href: '#' },
   ];
   return (
@@ -16,7 +15,7 @@ export function ShiftSidebar({ activeSection = 'generator', onNewRepair }: Props
           </div>
           <div>
             <p className="text-primary font-bold uppercase text-[10px] tracking-widest">SHIFT TERMINAL V2.0</p>
-            <p className="font-bold uppercase tracking-tight text-on-surface text-sm">GARAGE PORTAL</p>
+            <p className="font-bold uppercase tracking-tight text-on-surface text-sm">REPAIR PORTAL</p>
           </div>
         </div>
         <button
@@ -26,6 +25,11 @@ export function ShiftSidebar({ activeSection = 'generator', onNewRepair }: Props
           NEW REPAIR
         </button>
       </div>
+
+      <div className="px-6 mb-2">
+        <p className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/50">Categories</p>
+      </div>
+
       <div className="flex flex-col flex-1">
         {navItems.map((item) => {
           const isActive = item.id === activeSection;

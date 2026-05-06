@@ -35,6 +35,7 @@ export async function initDb(): Promise<void> {
       video_id            VARCHAR(11)   NOT NULL,
       provider            VARCHAR(50)   NOT NULL,
       model               VARCHAR(100)  NOT NULL,
+      category            VARCHAR(20)   NOT NULL DEFAULT 'auto',
       guide               JSON          NOT NULL,
       frames              JSON          NOT NULL,
       frames_analyzed     INT           NOT NULL DEFAULT 0,

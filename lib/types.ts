@@ -10,7 +10,10 @@ export interface VehicleInfo {
 
 export type Difficulty = 'beginner' | 'intermediate' | 'advanced' | 'expert';
 
+export type RepairCategory = 'auto' | 'home';
+
 export interface RepairGuide {
+  category?: RepairCategory;
   videoTitle: string;
   videoUrl: string;
   thumbnailUrl: string;
