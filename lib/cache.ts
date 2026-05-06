@@ -151,6 +151,41 @@ export async function deleteCachedGuide(
   }
 }
 
+export async function getAllCachedGuides(): Promise<CachedGuide[]> {
+  const results: CachedGuide[] = [];
+
+  if (isRedisAvailable && redisClient) {
+    try {
+      const keys = await redisClient.keys('guide:*');
+      for (const key of keys) {
+        const raw = await redisClient.get(key);
+        if (raw) {
+          try {
+            results.push(JSON.parse(raw) as CachedGuide);
+          } catch (e) {
+            console.warn('Failed to parse redis guide key', key);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Redis keys error:', err);
+    }
+  } else {
+    for (const [key, value] of memoryCache.entries()) {
+      if (key.startsWith('guide:') && value.expiry > Date.now()) {
+        try {
+          results.push(JSON.parse(value.value) as CachedGuide);
+        } catch (e) {
+          console.warn('Failed to parse memory guide key', key);
+        }
+      }
+    }
+  }
+
+  // Sort by cachedAt descending
+  return results.sort((a, b) => b.cachedAt - a.cachedAt);
+}
+
 // ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------

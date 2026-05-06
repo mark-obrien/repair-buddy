@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { AppLayout } from '@/components/AppLayout';
 
 export const metadata: Metadata = {
   title: 'Repair Buddy — YouTube Repair Guide Generator',
@@ -22,7 +23,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <AppLayout>{children}</AppLayout>
+      </body>
     </html>
   );
 }
