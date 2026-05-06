@@ -42,7 +42,7 @@ export const PROVIDERS: ProviderConfig[] = [
     name: 'Google',
     envKey: 'GOOGLE_GENERATIVE_AI_API_KEY',
     models: [
-      { id: 'gemini-2.0-flash-001', name: 'Gemini 2.0 Flash', supportsVision: true, description: 'Fast and efficient' },
+      { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', supportsVision: true, description: 'Fast and efficient' },
       { id: 'gemini-2.5-pro-preview-05-06', name: 'Gemini 2.5 Pro', supportsVision: true, description: 'Google\'s most capable model' },
     ],
   },

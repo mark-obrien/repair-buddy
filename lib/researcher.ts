@@ -57,7 +57,7 @@ function getResearchModel(providerId: string, selectedModelId: string): string {
   const fastModels: Record<string, string> = {
     anthropic: 'claude-haiku-4-5-20251001',
     openai: 'gpt-4o-mini',
-    google: 'gemini-2.0-flash-001',
+    google: 'gemini-2.5-flash',
   };
   return fastModels[providerId] ?? selectedModelId;
 }

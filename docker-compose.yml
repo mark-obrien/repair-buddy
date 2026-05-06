@@ -1,15 +1,25 @@
 services:
   app:
-    build: .
+    build:
+      context: .
+      # We target 'deps' to avoid the long 'npm run build' step
+      target: deps
     ports:
       - "6788:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules # Important: keeps container modules separate from host
+      - /app/.next        # Prevents build cache conflicts
     environment:
+      - NODE_ENV=development
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GOOGLE_GENERATIVE_AI_API_KEY=${GOOGLE_GENERATIVE_AI_API_KEY}
       - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
       - REDIS_URL=redis://redis:6379
       - FFMPEG_PATH=/usr/bin/ffmpeg
+    # Overwrite the production CMD ["node", "server.js"]
+    command: npm run dev
     depends_on:
       redis:
         condition: service_healthy

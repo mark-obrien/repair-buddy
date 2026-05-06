@@ -13,26 +13,26 @@ RUN npm run build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
+
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
-RUN apk add --no-cache ffmpeg yt-dlp && \
-    addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+# Install runtime dependencies
+RUN apk add --no-cache ffmpeg yt-dlp
 
-# No /app/public copy — the project doesn't ship any static assets.
-# (Re-add `COPY --from=builder /app/public ./public` if you ever add files there.)
+# Set up user and directory in one go
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs && \
+    mkdir -p .next/cache && \
+    chown nextjs:nodejs .next/cache
+
+# Copy built assets
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Pre-create .next/cache so the runtime can write to it. Even with image
-# optimization disabled, Next creates cache subdirectories at runtime
-# (fetch cache, etc.) — without this, the nextjs user gets EACCES on
-# /app/.next/cache because /app itself is owned by root.
-RUN mkdir -p /app/.next/cache && chown -R nextjs:nodejs /app/.next
-
 USER nextjs
 EXPOSE 3000
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
+
 CMD ["node", "server.js"]

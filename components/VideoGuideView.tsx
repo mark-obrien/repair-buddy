@@ -176,7 +176,7 @@ export function VideoGuideView({ guide, frames = [] }: Props) {
     <div className="flex flex-col md:grid md:grid-cols-[1fr_300px] lg:grid-cols-[1fr_360px]">
 
       {/* ── Video column ───────────────────────────────────────── */}
-      <div className="bg-on-background">
+      <div className="">
         <div className="relative w-full aspect-video">
           <div id="yt-player-host" className="absolute inset-0 w-full h-full" />
         </div>
