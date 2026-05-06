@@ -2,39 +2,43 @@ services:
   app:
     build:
       context: .
-      # We target 'deps' to avoid the long 'npm run build' step
       target: deps
     ports:
       - "6788:3000"
     volumes:
       - .:/app
-      - /app/node_modules # Important: keeps container modules separate from host
-      - /app/.next        # Prevents build cache conflicts
+      - /app/node_modules
+      - /app/.next
     environment:
       - NODE_ENV=development
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GOOGLE_GENERATIVE_AI_API_KEY=${GOOGLE_GENERATIVE_AI_API_KEY}
       - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
-      - REDIS_URL=redis://redis:6379
+      - MYSQL_URL=mysql://repair:repair@mysql:3306/repair_buddy
       - FFMPEG_PATH=/usr/bin/ffmpeg
-    # Overwrite the production CMD ["node", "server.js"]
     command: npm run dev
     depends_on:
-      redis:
+      mysql:
         condition: service_healthy
     restart: unless-stopped
 
-  redis:
-    image: redis:7-alpine
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: repair_buddy
+      MYSQL_USER: repair
+      MYSQL_PASSWORD: repair
     volumes:
-      - redis_data:/data
+      - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-urepair", "-prepair"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     restart: unless-stopped
 
 volumes:
-  redis_data:
+  mysql_data:

@@ -6,7 +6,7 @@ import {
   YoutubeTranscriptTooManyRequestError,
 } from 'youtube-transcript';
 import { transcribeWithWhisper, SpeechToTextError } from './speech-to-text';
-import { getCachedTranscript, cacheTranscript } from './cache';
+import { getCachedTranscript, cacheTranscript } from './db';
 
 export class TranscriptUnavailableError extends Error {
   constructor(message: string) {

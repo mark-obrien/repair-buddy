@@ -11,7 +11,7 @@ import { generateRepairGuide } from '@/lib/guide-generator';
 import { researchRepairTopic } from '@/lib/researcher';
 import { fetchTopComments } from '@/lib/comments';
 import { checkProviderKey, DEFAULT_PROVIDER, DEFAULT_MODEL, getModelOption } from '@/lib/providers';
-import { getCachedGuide, cacheGuide } from '@/lib/cache';
+import { getCachedGuide, cacheGuide } from '@/lib/db';
 
 export const maxDuration = 60;
 export const runtime = 'nodejs';
