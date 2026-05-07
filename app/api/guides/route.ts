@@ -6,8 +6,7 @@ export async function GET() {
   try {
     const guides = await getAllGuides();
     
-    // We only need metadata for the library view, don't send heavy arrays like frames or full steps
-    const libraryGuides = guides.map(g => ({
+    const libraryGuides = guides.map((g) => ({
       videoId: extractVideoId(g.guide.videoUrl) || 'unknown',
       provider: g.provider,
       model: g.model,
@@ -17,6 +16,7 @@ export async function GET() {
       difficulty: g.guide.difficulty,
       summary: g.guide.summary,
       vehicleApplicability: g.guide.vehicleInfo?.applicability || 'Universal',
+      category: g.guide.category,
     }));
 
     return NextResponse.json({ guides: libraryGuides });
