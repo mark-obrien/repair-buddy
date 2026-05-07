@@ -8,7 +8,6 @@ import { GuideResults } from '@/components/GuideResults';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { RegenerateButton } from '@/components/RegenerateButton';
 import { PrintButton } from '@/components/PrintButton';
-import { GarageModal } from '@/components/GarageModal';
 import { ShiftHeader } from '@/components/ShiftHeader';
 import { ShiftSidebar } from '@/components/ShiftSidebar';
 import { extractVideoId } from '@/lib/youtube';
@@ -158,7 +157,6 @@ export default function Home({
         )}
       </main>
 
-      <GarageModal isOpen={garageOpen} onClose={() => setGarageOpen(false)} onChange={() => setGarageVersion((v) => v + 1)} />
     </div>
   );
 }

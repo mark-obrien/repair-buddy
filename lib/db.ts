@@ -161,3 +161,30 @@ export async function deleteGuide(
     [videoId, provider, model]
   );
 }
+
+export async function getAllGuides(): Promise<StoredGuide[]> {
+  const rows = await query<{
+    video_id: string;
+    guide: string;
+    frames: string;
+    frames_analyzed: number;
+    research_performed: number;
+    comments_analyzed: number;
+    provider: string;
+    model: string;
+    created_at: Date;
+  }>(
+    'SELECT video_id, guide, frames, frames_analyzed, research_performed, comments_analyzed, provider, model, created_at FROM guides ORDER BY created_at DESC'
+  );
+
+  return rows.map((row) => ({
+    guide: typeof row.guide === 'string' ? JSON.parse(row.guide) : row.guide,
+    frames: typeof row.frames === 'string' ? JSON.parse(row.frames) : (row.frames as unknown as string[]),
+    framesAnalyzed: row.frames_analyzed,
+    researchPerformed: Boolean(row.research_performed),
+    commentsAnalyzed: row.comments_analyzed,
+    provider: row.provider,
+    model: row.model,
+    cachedAt: row.created_at.getTime(),
+  }));
+}

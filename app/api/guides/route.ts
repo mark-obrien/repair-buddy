@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getAllCachedGuides } from '@/lib/cache';
+import { getAllGuides } from '@/lib/db';
 import { extractVideoId } from '@/lib/youtube';
 
 export async function GET() {
   try {
-    const guides = await getAllCachedGuides();
+    const guides = await getAllGuides();
     
     // We only need metadata for the library view, don't send heavy arrays like frames or full steps
     const libraryGuides = guides.map(g => ({
