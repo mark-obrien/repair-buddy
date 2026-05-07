@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getCachedGuide } from '@/lib/cache';
+import { getCachedGuide } from '@/lib/db';
 import { DEFAULT_PROVIDER, DEFAULT_MODEL, getProviderConfig } from '@/lib/providers';
 
 export const runtime = 'nodejs';

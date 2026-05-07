@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { RepairGuide } from '@/lib/types';
+import type { RepairGuide, RepairCategory } from '@/lib/types';
 import { OverviewTab } from '@/components/tabs/OverviewTab';
 import { PartsTab } from '@/components/tabs/PartsTab';
 import { ToolsTab } from '@/components/tabs/ToolsTab';
@@ -19,17 +19,18 @@ interface Props {
   frames?: string[];
   provider?: string;
   model?: string;
+  category?: RepairCategory;
 }
 
 type TabId = 'watch' | 'overview' | 'parts' | 'tools' | 'torque' | 'steps' | 'warnings' | 'diagram' | 'parts-diagram' | 'shopping' | '3d';
 
-export function GuideResults({ guide, frames = [], provider = 'anthropic', model = 'claude-sonnet-4-6' }: Props) {
+export function GuideResults({ guide, frames = [], provider = 'anthropic', model = 'claude-sonnet-4-6', category = 'auto' }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [torqueUnit, setTorqueUnit] = useState<'ft-lb' | 'Nm'>('ft-lb');
 
   const toolCount = guide.standardTools.length + guide.specialtyTools.length;
 
-  const tabs: Array<{ id: TabId; label: string; count?: number }> = [
+  const baseTabs: Array<{ id: TabId; label: string; count?: number }> = [
     { id: 'overview', label: 'OVERVIEW' },
     { id: 'watch', label: 'WATCH' },
     { id: 'parts', label: 'PARTS', count: guide.partsNeeded.length },
@@ -40,8 +41,11 @@ export function GuideResults({ guide, frames = [], provider = 'anthropic', model
     { id: 'shopping', label: 'SHOP', count: guide.partsNeeded.length },
     { id: 'parts-diagram', label: 'PARTS DIAGRAM' },
     { id: 'diagram', label: 'FLOW' },
-    { id: '3d', label: '3D VIEW' },
   ];
+
+  const tabs = category === 'auto'
+    ? [...baseTabs, { id: '3d' as TabId, label: '3D VIEW' }]
+    : baseTabs;
 
   const criticalWarning = guide.warnings[0];
   const topTorque = guide.torqueValues.slice(0, 3);
