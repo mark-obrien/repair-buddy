@@ -8,6 +8,7 @@ import { GarageModal } from '@/components/GarageModal';
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [garageOpen, setGarageOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -16,6 +17,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       setIsSidebarOpen(saved === 'true');
     }
   }, []);
+
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
 
   function toggleSidebar() {
     setIsSidebarOpen(prev => {
@@ -37,6 +42,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <header className="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-surface-container-lowest border-b border-surface-container-highest shadow-ambient print:hidden">
         <div className="flex items-center gap-3">
           <button onClick={toggleSidebar} className="hidden lg:block material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors cursor-pointer mr-2" title="Toggle Sidebar">
+            menu
+          </button>
+          <button onClick={() => setIsMobileMenuOpen(prev => !prev)} className="lg:hidden material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors cursor-pointer mr-2" title="Menu">
             menu
           </button>
           <div className="w-24 h-8 relative flex items-center justify-center overflow-hidden mix-blend-multiply">
@@ -70,6 +78,52 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
+
+      {/* Mobile menu overlay */}
+      {isMobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-40 print:hidden" onClick={() => setIsMobileMenuOpen(false)}>
+          <div className="absolute inset-0 bg-black/50" />
+        </div>
+      )}
+
+      {/* Mobile drawer */}
+      <div className={`lg:hidden fixed left-0 top-0 h-full w-72 z-50 bg-surface-container-lowest border-r border-surface-container-highest pt-20 flex flex-col print:hidden transition-transform duration-300 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="px-6 mb-8">
+          <a href="/" className="w-full bg-primary text-on-primary text-label-caps py-3 mt-2 font-bold rounded shadow-sm hover:bg-primary-container active:scale-95 transition-all uppercase tracking-widest flex items-center justify-center">
+            NEW REPAIR
+          </a>
+        </div>
+        <div className="flex flex-col flex-1">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href || (item.href === '/' && pathname.startsWith('/g/'));
+            return (
+              <Link
+                key={item.id}
+                href={item.href}
+                className={[
+                  'py-4 px-6 flex items-center gap-3 border-l-4 transition-all text-label-caps text-sm',
+                  isActive
+                    ? 'bg-primary-fixed text-primary border-primary font-bold'
+                    : 'text-on-surface-variant border-transparent hover:bg-surface-container-low hover:text-on-surface',
+                ].join(' ')}
+              >
+                <span className="material-symbols-outlined text-base">{item.icon}</span>
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+        <div className="p-6 border-t border-surface-container-highest flex flex-col gap-4">
+          <button onClick={() => { setGarageOpen(true); setIsMobileMenuOpen(false); }} className="text-on-surface-variant flex items-center gap-3 text-label-caps text-xs hover:text-primary transition-colors w-full">
+            <span className="material-symbols-outlined text-sm">garage</span>
+            <span>MY GARAGE</span>
+          </button>
+          <a className="text-on-surface-variant flex items-center gap-3 text-label-caps text-xs hover:text-error transition-colors w-full" href="#">
+            <span className="material-symbols-outlined text-sm">help_outline</span>
+            <span>SUPPORT</span>
+          </a>
+        </div>
+      </div>
 
       <nav className={`hidden lg:flex flex-col fixed left-0 top-0 h-full border-r border-surface-container-highest z-40 bg-surface-container-lowest pt-20 print:hidden transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-20'}`}>
         <div className={`mb-8 ${isSidebarOpen ? 'px-6' : 'px-4'}`}>
