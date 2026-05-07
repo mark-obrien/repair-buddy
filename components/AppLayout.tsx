@@ -44,7 +44,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <button onClick={toggleSidebar} className="hidden lg:block material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors cursor-pointer mr-2" title="Toggle Sidebar">
             menu
           </button>
-          <button onClick={() => setIsMobileMenuOpen(prev => !prev)} className="lg:hidden material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors cursor-pointer mr-2" title="Menu">
+          <button onClick={() => setIsMobileMenuOpen(prev => !prev)} className="block lg:hidden material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors cursor-pointer mr-2" title="Menu">
             menu
           </button>
           <div className="w-24 h-8 relative flex items-center justify-center overflow-hidden mix-blend-multiply">
