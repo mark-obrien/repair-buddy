@@ -1,9 +1,8 @@
 'use client';
 interface Props { activeSection?: string; onNewRepair?: () => void; }
-export function ShiftSidebar({ activeSection = 'auto', onNewRepair }: Props) {
+export function ShiftSidebar({ activeSection = 'generator', onNewRepair }: Props) {
   const navItems = [
-    { id: 'auto', label: 'Auto Repair', icon: 'directions_car', href: '/' },
-    { id: 'home', label: 'Home Repair', icon: 'home_repair_service', href: '/home-repair' },
+    { id: 'generator', label: 'Guide Generator', icon: 'construction', href: '/' },
     { id: 'settings', label: 'Settings', icon: 'settings', href: '#' },
   ];
   return (
@@ -25,11 +24,6 @@ export function ShiftSidebar({ activeSection = 'auto', onNewRepair }: Props) {
           NEW REPAIR
         </button>
       </div>
-
-      <div className="px-6 mb-2">
-        <p className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/50">Categories</p>
-      </div>
-
       <div className="flex flex-col flex-1">
         {navItems.map((item) => {
           const isActive = item.id === activeSection;

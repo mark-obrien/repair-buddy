@@ -1,12 +1,19 @@
 import { generateText, tool } from 'ai';
 import { z } from 'zod';
 import { getModel } from './providers';
-import type { RepairGuide, RepairCategory } from './types';
+import type { RepairGuide } from './types';
 
 // ---------------------------------------------------------------------------
 // Zod schema — single source of truth for the structured output
 // ---------------------------------------------------------------------------
 const repairGuideSchema = z.object({
+  category: z
+    .enum(['auto', 'home', 'appliance', 'electronics', 'outdoor', 'other'])
+    .catch('other')
+    .describe(
+      'Repair domain detected from the video content. auto=cars/trucks/motorcycles. home=plumbing/electrical/HVAC/carpentry/structural. appliance=dishwashers/washers/dryers/refrigerators/ovens. electronics=phones/computers/TVs/circuit boards. outdoor=lawn equipment/generators/power tools/bicycles. other=anything not covered above.'
+    ),
+
   vehicleInfo: z.object({
     applicability: z.string().catch('Universal / General repair').describe('Human-readable summary: e.g. "2018-2022 Toyota Camry" or "Universal / most vehicles"'),
     make: z.string().optional().catch(undefined),
@@ -24,7 +31,7 @@ const repairGuideSchema = z.object({
     .optional()
     .catch('intermediate' as any)
     .describe(
-      'Estimated DIY difficulty. beginner=basic hand tools, no special skills (e.g. cabin filter, wiper blades). intermediate=requires mechanical aptitude and a typical home garage (e.g. brake pads, alternator). advanced=requires specialty tools, lifts, or multi-system knowledge (e.g. timing belts, head gaskets). expert=specialist tools/training (e.g. transmission rebuild, hybrid HV system).'
+      'Estimated DIY difficulty relative to the repair domain. beginner=any motivated person with basic tools. intermediate=requires relevant aptitude and a modest toolkit. advanced=specialty tools, domain knowledge, or meaningful consequence of error. expert=licensed trade level or high safety risk.'
     ),
 
   difficultyReason: z
@@ -101,88 +108,50 @@ const repairGuideSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// System prompts — shared body + category-specific preamble
+// System prompt
 // ---------------------------------------------------------------------------
-const SHARED_PROMPT_BODY = `
-When research context is provided, use it as authoritative background knowledge. Cross-reference it against the video transcript and frames to produce the most accurate and complete guide possible. If the video contradicts the research on a factual point, prefer the video's explicit value but note the discrepancy.
+const SYSTEM_PROMPT = `You are an expert repair technician with 20+ years of hands-on experience across automotive, home improvement, appliances, electronics, outdoor equipment, and general DIY repair. You specialize in analyzing repair video transcripts and extracting precise, actionable information for DIY guides.
+
+CATEGORY: First, classify the repair domain from the video content and set the category field accordingly. Use the descriptions in the schema to pick the best match.
+
+When research context is provided, use it as authoritative background knowledge. Cross-reference it against the video transcript and frames. If the video contradicts the research on a factual point, prefer the video's explicit value but note the discrepancy.
 
 When viewer comments are provided, treat them as field-test feedback. They often catch errors, mention compatibility variations, or warn about gotchas the presenter missed. Incorporate the most-upvoted, relevant comments as warnings or step notes — but never invent part numbers or torque values from comments alone.
 
-SUBJECT INFO: Identify the specific item this repair applies to (vehicle, appliance, fixture, system). Populate the vehicleInfo fields: applicability is a concise human-readable summary (e.g. "2018-2022 Toyota Camry", "Moen 1225 kitchen faucet", "Carrier 24ACC636A003 AC unit"). Use make/model/yearRange/trim when applicable. Set isGeneral=true only when no specific subject is identifiable.
+SUBJECT INFO: Identify the specific item this repair applies to. Populate vehicleInfo.applicability with a concise human-readable summary (e.g. "2018-2022 Toyota Camry", "Moen 1225 kitchen faucet", "iPhone 14 Pro display assembly", "Carrier 24ACC636A003 AC unit"). Use make/model/yearRange/trim when applicable. Set isGeneral=true only when no specific subject is identifiable.
 
-DIFFICULTY: Rate the job on the four-level scale (beginner / intermediate / advanced / expert) using both the video evidence and your domain knowledge. Provide a one-sentence reason. Be honest — over-rating scares people off easy jobs and under-rating gets them stuck.
+DIFFICULTY: Rate the job relative to its domain. beginner=any motivated person with basic tools. intermediate=requires relevant aptitude and a modest toolkit. advanced=specialty tools, domain knowledge, or meaningful consequence of error. expert=licensed-trade level or high safety risk. Be honest.
 
-ESTIMATED TIME: Estimate total active time in minutes for an attentive DIYer working at a normal pace. Include diagnosis and reassembly. Do NOT include curing/drying/cooling/paint time unless that's the dominant cost. If the video states a time, prefer that.
+ESTIMATED TIME: Estimate total active time in minutes for an attentive DIYer at a normal pace. Exclude curing/drying/cooling time unless it dominates. Prefer the video's stated time.
 
-PARTS: Extract every part mentioned — model/part numbers, quantities, and brand recommendations. Only include part numbers if explicitly stated verbally.
+PARTS: Extract every part mentioned — part numbers, quantities, brand recommendations. Only include part numbers if explicitly stated verbally.
 
-STANDARD TOOLS: Extract all common tools mentioned with sizes/specifications where given.
+STANDARD TOOLS: Extract all common tools with sizes/specifications where given.
 
 SPECIALTY TOOLS: Identify non-standard tools. Always note purpose and any DIY alternative.
 
 TORQUE VALUES: Extract every torque specification precisely as stated — never round or estimate.
 
-REPAIR STEPS: Extract 8-20 logical, actionable steps covering the full procedure. Include step-specific warnings inline. The transcript contains [MM:SS] timestamp markers every ~10 seconds — for each step, find the [MM:SS] marker that immediately precedes the relevant transcript text, and return that exact string (e.g., "04:15" or "1:02:30") as the timestamp. Do NOT attempt to calculate total seconds.
+REPAIR STEPS: Extract 8-20 logical, actionable steps. Include step-specific warnings inline. The transcript contains [MM:SS] timestamp markers every ~10 seconds — for each step, find the [MM:SS] marker that immediately precedes the relevant transcript text and return that exact string as the timestamp. Do NOT calculate total seconds.
 
-FRAME INDEXING: When video frames are provided, you will see them attached as images in chronological order, indexed 0..N-1, evenly spaced from ~10% to ~85% of the video duration. For each repair step, set frameIndex to the index (0-based) of the frame that BEST illustrates that step visually. If no provided frame clearly illustrates a step, omit frameIndex. Do NOT invent a frameIndex outside the range of provided frames.
+FRAME INDEXING: When video frames are provided, they are attached as images in chronological order, indexed 0..N-1. For each step, set frameIndex to the 0-based index of the frame that best illustrates it. Omit if no frame clearly fits. Do NOT invent an index outside the provided range.
 
-FRAME ANNOTATIONS: For any provided video frame that clearly shows key parts or tools, generate an entry in frameAnnotations identifying the components visible with approximate X/Y percentages (0-100) from the top-left corner.
+FRAME ANNOTATIONS: For any frame that clearly shows key parts or tools, generate an entry in frameAnnotations with approximate X/Y percentages (0-100) from the top-left corner.
 
-WARNINGS: Extract all safety warnings, common mistakes, and "gotchas."
+WARNINGS: Extract all safety warnings, common mistakes, and gotchas.
 
 PROCESS DIAGRAM: Valid Mermaid flowchart TD showing the repair workflow. 8-15 steps. Short alphanumeric labels only.
 
-PARTS DIAGRAM: A clean, detailed SVG schematic (viewBox 0 0 800 600) of the physical component layout.
-
-REQUIRED STRUCTURE:
-1. White background: <rect width="800" height="600" fill="white"/>
-2. Title: centered bold text at y=30, font-size 18, describing the specific repair
-3. Components drawn in center region (x: 60–720, y: 50–490)
-4. Legend box anchored at bottom-right (x≈540, y≈495, width≈245, height auto)
-
-COMPONENTS (8–14 parts):
-- Draw each as a meaningful shape (rect, circle, ellipse, path) — not just generic boxes
-- Fill/stroke by type: primary=#fed7aa/#f97316, structural=#e2e8f0/#94a3b8, fasteners=#fef9c3/#ca8a04, seals=#dcfce7/#16a34a, sensors=#dbeafe/#2563eb, rotating=#f3e8ff/#9333ea, fluid=#cffafe/#0891b2
-- Bold component name label (font-size 12, font-weight bold, font-family system-ui) placed OUTSIDE the shape with a dashed leader line (<line stroke-dasharray="4 2" stroke="#999"/>)
-- If video frames were provided, reflect actual shapes and positions visible in the frames
-
-LEGEND (bottom-right box):
-- Thin border rect, light gray background (#f9fafb)
-- "Legend" heading, then one row per color used: colored swatch rect (14×14) + label
-
-QUALITY RULES:
-- No overlapping labels
-- Minimum 20px gap between component shapes
-- All text within viewBox bounds (x: 5–795, y: 12–595)
+PARTS DIAGRAM: A clean SVG schematic (viewBox 0 0 800 600).
+- White background: <rect width="800" height="600" fill="white"/>
+- Title: centered bold text at y=30, font-size 18
+- Components in center region (x: 60–720, y: 50–490); legend bottom-right (x≈540, y≈495)
+- Meaningful shapes, not generic boxes. Fill by type: primary=#fed7aa/#f97316, structural=#e2e8f0/#94a3b8, fasteners=#fef9c3/#ca8a04, seals=#dcfce7/#16a34a, sensors=#dbeafe/#2563eb, rotating=#f3e8ff/#9333ea, fluid=#cffafe/#0891b2
+- Labels outside shapes with dashed leader lines. No overlapping labels. Min 20px gap between shapes.
 - NO script tags, NO event handlers, NO external hrefs
+- Must include xmlns="http://www.w3.org/2000/svg"
 
-IMPORTANT RULES:
-- Never invent part numbers, torque values, or steps not found in the transcript/frames/research
-- Return empty arrays for fields with no data — never null
-- The Mermaid diagram must start with exactly: flowchart TD
-- The SVG must include xmlns="http://www.w3.org/2000/svg"`;
-
-const CATEGORY_PREAMBLES: Record<RepairCategory, string> = {
-  auto: `You are an expert automotive technician with 20+ years of experience diagnosing and repairing cars, trucks, and light commercial vehicles. You specialize in analyzing repair video transcripts and extracting precise, actionable information for DIY repair guides.
-
-Difficulty scale for automotive:
-- beginner: basic hand tools, no jacking required (e.g. cabin filter, wiper blades, bulb replacement)
-- intermediate: mechanical aptitude + typical home garage, jack stands required (e.g. brake pads, alternator, serpentine belt)
-- advanced: specialty tools or multi-system knowledge (e.g. timing belt/chain, wheel bearings, head gasket)
-- expert: professional tools, training, or high-risk systems (e.g. transmission rebuild, hybrid HV battery, airbag system)`,
-
-  home: `You are an expert home repair and improvement technician with 20+ years of experience across plumbing, electrical, HVAC, carpentry, appliances, and general building systems. You specialize in analyzing repair video transcripts and extracting precise, actionable information for DIY homeowner guides.
-
-Difficulty scale for home repair:
-- beginner: basic tools, no trade knowledge required (e.g. replacing a light switch, unclogging a drain, patching drywall)
-- intermediate: some trade knowledge or physical effort (e.g. replacing a faucet, installing a ceiling fan, patching subfloor)
-- advanced: code awareness, specialty tools, or risk of damage (e.g. adding a circuit breaker, replacing a water heater, tiling a shower)
-- expert: licensed trade typically required or high safety risk (e.g. main panel upgrade, gas line work, structural modifications)`,
-};
-
-function buildSystemPrompt(category: RepairCategory): string {
-  return CATEGORY_PREAMBLES[category] + '\n' + SHARED_PROMPT_BODY;
-}
+IMPORTANT: Never invent part numbers, torque values, or steps not in the transcript/frames/research. Return empty arrays for fields with no data — never null. Mermaid diagram must start with exactly: flowchart TD`;
 
 // ---------------------------------------------------------------------------
 // Main export
@@ -205,11 +174,9 @@ export async function generateRepairGuide(
   commentsContext: string = '',
   providerId: string = 'anthropic',
   modelId: string = 'claude-sonnet-4-6',
-  durationSeconds: number = 0,
-  category: RepairCategory = 'auto'
+  durationSeconds: number = 0
 ): Promise<RepairGuide> {
   const model = getModel(providerId, modelId);
-  const systemPrompt = buildSystemPrompt(category);
 
   const frameNote = frames.length > 0
     ? `\n\n${frames.length} VIDEO FRAMES are attached (chronological, 10%–85% of duration, indexed 0..${frames.length - 1}). Use them to identify component shapes and to set frameIndex on each repair step.`
@@ -232,7 +199,7 @@ export async function generateRepairGuide(
   const result = await generateText({
     model,
     maxTokens: 12000,
-    system: systemPrompt,
+    system: SYSTEM_PROMPT,
     tools: {
       generate_repair_guide: tool({
         description: 'Extract structured repair guide data from the video transcript, research context, comments, and video frames.',
@@ -300,7 +267,6 @@ export async function generateRepairGuide(
     videoTitle,
     videoUrl,
     thumbnailUrl,
-    category,
     ...(extracted as any),
   };
 }

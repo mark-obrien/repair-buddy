@@ -10,7 +10,7 @@ export interface VehicleInfo {
 
 export type Difficulty = 'beginner' | 'intermediate' | 'advanced' | 'expert';
 
-export type RepairCategory = 'auto' | 'home';
+export type RepairCategory = 'auto' | 'home' | 'appliance' | 'electronics' | 'outdoor' | 'other';
 
 export interface RepairGuide {
   category?: RepairCategory;

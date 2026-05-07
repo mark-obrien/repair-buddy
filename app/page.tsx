@@ -46,7 +46,7 @@ export default function Home({
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, provider, model, force, category: 'auto' }),
+        body: JSON.stringify({ url, provider, model, force }),
       });
       const data = await res.json();
       if (!res.ok || data.error) { setError(data.error ?? 'Something went wrong.'); setStatus('error'); return; }
@@ -78,7 +78,7 @@ export default function Home({
   return (
     <div className="min-h-screen bg-background">
       <ShiftHeader onNewRepair={resetToIdle} />
-      <ShiftSidebar activeSection="auto" onNewRepair={resetToIdle} />
+      <ShiftSidebar activeSection="generator" onNewRepair={resetToIdle} />
 
       <main className="lg:ml-64 pt-20 px-gutter lg:px-margin pb-xl">
         {/* URL Input Form — always visible when idle or on error */}
@@ -107,6 +107,9 @@ export default function Home({
             {/* Guide header */}
             <div className="mb-6 border-l-4 border-primary pl-6 pt-8">
               <div className="flex flex-wrap gap-2 items-center mb-2">
+                {guide.category && (
+                  <span className="bg-primary text-on-primary font-bold px-2 py-0.5 text-[10px] rounded-sm uppercase tracking-widest">{guide.category}</span>
+                )}
                 {isCritical && (
                   <span className="bg-error text-on-error font-bold px-2 py-0.5 text-[10px] rounded-sm uppercase tracking-widest">CRITICAL REPAIR</span>
                 )}
@@ -136,7 +139,7 @@ export default function Home({
               </button>
             </div>
 
-            <GuideResults key={garageVersion} guide={guide} frames={frames} provider={meta.provider} model={meta.model} category="auto" />
+            <GuideResults key={garageVersion} guide={guide} frames={frames} provider={meta.provider} model={meta.model} category={guide.category} />
           </>
         )}
 
@@ -145,7 +148,7 @@ export default function Home({
             {[
               { icon: 'biotech', label: 'Research-First AI', desc: 'Pre-researches the repair topic before analyzing the video' },
               { icon: 'movie', label: 'Frame Analysis', desc: 'Analyzes video frames and viewer comments for accuracy' },
-              { icon: 'garage', label: 'Vehicle Garage', desc: 'Save your vehicles and check compatibility instantly' },
+              { icon: 'category', label: 'Auto-Detected Topic', desc: 'Works for auto, home, appliances, electronics, and more' },
             ].map((f) => (
               <div key={f.label} className="bg-surface-container-lowest border border-surface-container-highest rounded-lg p-6 shadow-sm">
                 <span className="material-symbols-outlined text-primary text-3xl mb-3 block">{f.icon}</span>
