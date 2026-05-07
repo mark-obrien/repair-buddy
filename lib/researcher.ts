@@ -1,6 +1,6 @@
 import { generateText } from 'ai';
 import { getModel } from './providers';
-import { fetchLemonManuals } from './web-sources';
+import { fetchLemonManuals, fetchIFixit } from './web-sources';
 
 const RESEARCH_SYSTEM_PROMPT = `You are a master repair technician with encyclopedic knowledge across automotive, home improvement, appliances, electronics, outdoor equipment, and general DIY repair.
 
@@ -28,8 +28,9 @@ export async function researchRepairTopic(
   const researchModelId = getResearchModel(providerId, modelId);
   const model = getModel(providerId, researchModelId);
 
-  const [manualContent, aiResult] = await Promise.all([
+  const [lemonContent, ifixitContent, aiResult] = await Promise.all([
     fetchLemonManuals(videoTitle),
+    fetchIFixit(videoTitle),
     generateText({
       model,
       maxTokens: 1500,
@@ -44,10 +45,8 @@ export async function researchRepairTopic(
 
   const parts: string[] = [];
   if (aiResult?.text) parts.push(aiResult.text);
-  if (manualContent) {
-    parts.push(`\n---\nMANUAL SOURCE (lemon-manuals.la):\n${manualContent}`);
-    console.log(`lemon-manuals.la: ${manualContent.length} chars fetched`);
-  }
+  if (lemonContent) parts.push(`\n---\nMANUAL SOURCE (lemon-manuals.la):\n${lemonContent}`);
+  if (ifixitContent) parts.push(`\n---\nREPAIR GUIDE SOURCE (iFixit):\n${ifixitContent}`);
   return parts.join('\n');
 }
 
