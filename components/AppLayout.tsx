@@ -41,11 +41,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-background text-on-surface font-sans">
       <header className="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-surface-container-lowest border-b border-surface-container-highest shadow-ambient print:hidden">
         <div className="flex items-center gap-3">
-          <button onClick={toggleSidebar} className="hidden lg:block material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors cursor-pointer mr-2" title="Toggle Sidebar">
-            menu
+          <button onClick={toggleSidebar} className="hidden lg:flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer mr-2" title="Toggle Sidebar">
+            <span className="material-symbols-outlined">menu</span>
           </button>
-          <button onClick={() => setIsMobileMenuOpen(prev => !prev)} className="block lg:hidden material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors cursor-pointer mr-2" title="Menu">
-            menu
+          <button onClick={() => setIsMobileMenuOpen(prev => !prev)} className="flex lg:hidden items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer mr-2" title="Menu">
+            <span className="material-symbols-outlined">menu</span>
           </button>
           <div className="w-24 h-8 relative flex items-center justify-center overflow-hidden mix-blend-multiply">
             <img src="/logo.jpg" alt="SHIFT" className="absolute w-[200%] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
