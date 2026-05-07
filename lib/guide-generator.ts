@@ -196,36 +196,51 @@ export async function generateRepairGuide(
 
   const userText = `VIDEO TITLE: ${videoTitle}\nVIDEO URL: ${videoUrl}${durationNote}${researchNote}${commentsNote}${frameNote}\n\nTRANSCRIPT:\n${transcript}`;
 
-  const result = await generateText({
-    model,
-    maxTokens: 12000,
-    system: SYSTEM_PROMPT,
-    tools: {
-      generate_repair_guide: tool({
-        description: 'Extract structured repair guide data from the video transcript, research context, comments, and video frames.',
-        parameters: repairGuideSchema,
-      }),
-    },
-    toolChoice: { type: 'tool', toolName: 'generate_repair_guide' },
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: userText },
-          ...frames.map((b64) => ({
-            type: 'image' as const,
-            image: Buffer.from(b64, 'base64'),
-            mimeType: 'image/jpeg' as const,
-          })),
-        ],
+  const imageContent = frames.map((b64) => ({
+    type: 'image' as const,
+    image: Buffer.from(b64, 'base64'),
+    mimeType: 'image/jpeg' as const,
+  }));
+
+  async function callModel(schema: typeof repairGuideSchema, attempt: number) {
+    const res = await generateText({
+      model,
+      maxTokens: 16000,
+      system: SYSTEM_PROMPT,
+      tools: {
+        generate_repair_guide: tool({
+          description: 'Extract structured repair guide data from the video transcript, research context, comments, and video frames.',
+          parameters: schema,
+        }),
       },
-    ],
-    abortSignal: undefined,
-  });
+      toolChoice: { type: 'tool', toolName: 'generate_repair_guide' },
+      messages: [
+        {
+          role: 'user',
+          content: [{ type: 'text', text: userText }, ...imageContent],
+        },
+      ],
+      abortSignal: undefined,
+    });
+    console.log(`Guide generation attempt ${attempt}: finishReason=${res.finishReason} toolCalls=${res.toolCalls.length}`);
+    return res;
+  }
+
+  // First attempt — full schema
+  let result = await callModel(repairGuideSchema, 1);
+
+  // If truncated or no tool call, retry without the heavy SVG diagram field
+  if (!result.toolCalls[0] || result.finishReason === 'length') {
+    console.warn(`Retrying without partsDiagram (finishReason=${result.finishReason})`);
+    const reducedSchema = repairGuideSchema.omit({ partsDiagram: true });
+    result = await callModel(reducedSchema as typeof repairGuideSchema, 2);
+  }
 
   const toolCall = result.toolCalls[0];
   if (!toolCall) {
-    throw new Error('Model did not return structured repair guide data.');
+    throw new Error(
+      `Model did not return structured repair guide data (finishReason=${result.finishReason}, text length=${result.text?.length ?? 0}).`
+    );
   }
 
   type GuideInput = z.infer<typeof repairGuideSchema>;
