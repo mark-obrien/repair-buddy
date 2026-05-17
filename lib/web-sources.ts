@@ -99,9 +99,15 @@ export interface ManualImage {
   caption: string;   // surrounding text used as the figure caption
 }
 
+export interface ManualLink {
+  url: string;
+  label: string;
+}
+
 export interface LemonManualsResult {
   text: string;
   images: ManualImage[];
+  links: ManualLink[];
 }
 
 /**
@@ -298,7 +304,7 @@ export async function fetchLemonManualsVehicle(
   vehicle: VehicleHint,
   repairQuery: string
 ): Promise<LemonManualsResult> {
-  const empty: LemonManualsResult = { text: '', images: [] };
+  const empty: LemonManualsResult = { text: '', images: [], links: [] };
   try {
     // ── 1. Fetch the make/year listing to find exact model URLs ──────────
     // Try the extracted year first; if that yields no models (e.g. the title
@@ -383,11 +389,27 @@ export async function fetchLemonManualsVehicle(
     const combined = sectionTexts.filter(Boolean).join('\n\n');
     const uniqueImages = allImages.filter((img, i, arr) => arr.findIndex(x => x.url === img.url) === i);
 
-    console.log(`lemon-manuals: ${combined.length} chars + ${uniqueImages.length} diagrams from OEM manual for ${vehicle.make} ${resolvedYear}`);
+    // Build useful links: vehicle page, single-page index, and each fetched section
+    function sectionLabel(url: string): string {
+      // Decode and strip the vehicle base and leading path segment
+      const decoded = decodeURIComponent(url.replace(bestModel, '').replace(/\/$/, ''));
+      // Take the last meaningful path segment as the label
+      const parts = decoded.split('/').filter(Boolean);
+      return parts[parts.length - 1] ?? decoded;
+    }
+
+    const manualLinks: ManualLink[] = [
+      { url: bestModel, label: `${vehicle.make} ${resolvedYear} — Service Manual` },
+      { url: repairIndexUrl, label: 'Full Repair & Diagnosis Index' },
+      ...rankedSections.map(({ url }) => ({ url, label: sectionLabel(url) })),
+    ];
+
+    console.log(`lemon-manuals: ${combined.length} chars + ${uniqueImages.length} diagrams + ${manualLinks.length} links for ${vehicle.make} ${resolvedYear}`);
 
     return {
       text: combined.slice(0, MAX_CONTENT_CHARS * 2),
-      images: uniqueImages.slice(0, 12), // cap at 12 diagrams
+      images: uniqueImages.slice(0, 12),
+      links: manualLinks,
     };
 
   } catch (err) {

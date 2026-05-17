@@ -59,6 +59,8 @@ export interface RepairGuide {
   partsDiagram?: string;
   /** Real OEM diagrams fetched from Lemon Manuals, stored as base64 PNG */
   manualDiagrams?: Array<{ src: string; caption: string }>;
+  /** Links to relevant Lemon Manuals pages for this repair */
+  manualLinks?: Array<{ url: string; label: string }>;
   frameAnnotations?: Array<{
     frameIndex: number;
     parts: Array<{

@@ -1,8 +1,8 @@
 import { generateText } from 'ai';
 import { getModel } from './providers';
-import { fetchLemonManuals, fetchLemonManualsVehicle, fetchIFixit, extractVehicleHint, type ManualImage } from './web-sources';
+import { fetchLemonManuals, fetchLemonManualsVehicle, fetchIFixit, extractVehicleHint, type ManualImage, type ManualLink } from './web-sources';
 
-export type { ManualImage };
+export type { ManualImage, ManualLink };
 
 const RESEARCH_SYSTEM_PROMPT = `You are a master repair technician with encyclopedic knowledge across automotive, home improvement, appliances, electronics, outdoor equipment, and general DIY repair.
 
@@ -41,6 +41,7 @@ function cleanSearchQuery(title: string): string {
 export interface ResearchResult {
   text: string;
   manualImages: ManualImage[];
+  manualLinks: ManualLink[];
 }
 
 export async function researchRepairTopic(
@@ -64,7 +65,7 @@ export async function researchRepairTopic(
   // Fallback does a generic keyword search.
   const lemonFetch = vehicle
     ? fetchLemonManualsVehicle(vehicle, searchQuery)
-    : fetchLemonManuals(searchQuery).then((text) => ({ text, images: [] }));
+    : fetchLemonManuals(searchQuery).then((text) => ({ text, images: [], links: [] }));
 
   const [lemonResult, ifixitContent, aiResult] = await Promise.all([
     lemonFetch,
@@ -94,6 +95,7 @@ export async function researchRepairTopic(
   return {
     text: parts.join('\n'),
     manualImages: lemonResult.images ?? [],
+    manualLinks: lemonResult.links ?? [],
   };
 }
 

@@ -117,6 +117,7 @@ export async function POST(request: Request) {
 
   const researchContext = researchResult.text;
   const manualImageUrls = researchResult.manualImages;
+  const manualLinks = researchResult.manualLinks;
 
   if (researchContext) console.log(`Research context: ${researchContext.length} chars`);
   if (manualImageUrls.length) console.log(`Manual diagrams found: ${manualImageUrls.length}`);
@@ -160,10 +161,13 @@ export async function POST(request: Request) {
       durationSeconds
     );
 
-    // Attach OEM diagrams to the guide object
+    // Attach OEM diagrams and links to the guide object
     if (manualDiagrams.length > 0) {
       guide.manualDiagrams = manualDiagrams;
       console.log(`Attached ${manualDiagrams.length} OEM diagrams to guide`);
+    }
+    if (manualLinks.length > 0) {
+      guide.manualLinks = manualLinks;
     }
 
     const responsePayload = {

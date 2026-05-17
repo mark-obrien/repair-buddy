@@ -333,6 +333,38 @@ export function GuideResults({ guide, frames = [], provider = 'anthropic', model
                       </div>
                     </section>
                 )}
+
+                {/* OEM manual links */}
+                {guide.manualLinks && guide.manualLinks.length > 0 && (
+                  <section className="bg-surface-container-lowest border border-surface-container-highest rounded-lg overflow-hidden shadow-ambient">
+                    <div className="px-4 py-2.5 border-b border-surface-container-highest bg-surface-container-low flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary text-sm">menu_book</span>
+                      <span className="text-label-caps text-on-surface-variant text-[10px] uppercase tracking-widest font-bold">
+                        OEM Service Manual
+                      </span>
+                    </div>
+                    <div className="p-3 space-y-1">
+                      {guide.manualLinks.map((link, i) => (
+                        <a
+                          key={i}
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`flex items-start gap-2 px-2 py-1.5 rounded hover:bg-surface-container-low transition-colors group ${
+                            i === 0 ? 'border-b border-surface-container-highest pb-2 mb-1' : ''
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-outline group-hover:text-primary text-sm mt-0.5 shrink-0 transition-colors">
+                            {i === 0 ? 'home_repair_service' : i === 1 ? 'list' : 'article'}
+                          </span>
+                          <span className="text-[11px] text-on-surface-variant group-hover:text-primary font-medium leading-tight transition-colors">
+                            {link.label}
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  </section>
+                )}
               </aside>
             </div>
         )}
