@@ -65,7 +65,7 @@ export async function researchRepairTopic(
   // Fallback does a generic keyword search.
   const lemonFetch = vehicle
     ? fetchLemonManualsVehicle(vehicle, searchQuery)
-    : fetchLemonManuals(searchQuery).then((text) => ({ text, images: [], links: [] }));
+    : fetchLemonManuals(searchQuery);
 
   const [lemonResult, ifixitContent, aiResult] = await Promise.all([
     lemonFetch,

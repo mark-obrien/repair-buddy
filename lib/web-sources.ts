@@ -81,10 +81,69 @@ const KNOWN_MAKES = [
 // Common abbreviations that appear in titles but differ from Lemon's make names
 const MAKE_ALIASES: Record<string, string> = {
   'chevy': 'Chevrolet',
+  'chevy\'s': 'Chevrolet',
   'vw': 'Volkswagen',
   'mercedes': 'Mercedes-Benz',
   'benz': 'Mercedes-Benz',
   'range rover': 'Land Rover',
+  'bimmer': 'BMW',
+  'beemer': 'BMW',
+  'subie': 'Subaru',
+  'mopar': 'Dodge',
+  // Popular model names that unambiguously identify a make
+  'silverado': 'Chevrolet',
+  'tahoe': 'Chevrolet',
+  'suburban': 'Chevrolet',
+  'colorado': 'Chevrolet',
+  'equinox': 'Chevrolet',
+  'traverse': 'Chevrolet',
+  'malibu': 'Chevrolet',
+  'f-150': 'Ford',
+  'f150': 'Ford',
+  'f-250': 'Ford',
+  'f250': 'Ford',
+  'mustang': 'Ford',
+  'explorer': 'Ford',
+  'escape': 'Ford',
+  'ranger': 'Ford',
+  'bronco': 'Ford',
+  'expedition': 'Ford',
+  'fusion': 'Ford',
+  'camry': 'Toyota',
+  'corolla': 'Toyota',
+  'tacoma': 'Toyota',
+  '4runner': 'Toyota',
+  'highlander': 'Toyota',
+  'prius': 'Toyota',
+  'sienna': 'Toyota',
+  'tundra': 'Toyota',
+  'rav4': 'Toyota',
+  'civic': 'Honda',
+  'accord': 'Honda',
+  'cr-v': 'Honda',
+  'crv': 'Honda',
+  'pilot': 'Honda',
+  'odyssey': 'Honda',
+  'fit': 'Honda',
+  'altima': 'Nissan',
+  'sentra': 'Nissan',
+  'rogue': 'Nissan',
+  'pathfinder': 'Nissan',
+  'frontier': 'Nissan',
+  'maxima': 'Nissan',
+  'elantra': 'Hyundai',
+  'sonata': 'Hyundai',
+  'santa fe': 'Hyundai',
+  'tucson': 'Hyundai',
+  'wrangler': 'Jeep',
+  'grand cherokee': 'Jeep',
+  'cherokee': 'Jeep',
+  'compass': 'Jeep',
+  'charger': 'Dodge',
+  'challenger': 'Dodge',
+  'durango': 'Dodge',
+  'ram 1500': 'Ram',
+  'ram 2500': 'Ram',
 };
 
 export interface VehicleHint {
@@ -122,7 +181,8 @@ function expandTwoDigitYear(twoDigit: string): string {
 /**
  * Extract make, year, and likely model words from a video title.
  * Handles both 4-digit years ("2014") and 2-digit year ranges ("07-14").
- * Returns null if no make/year can be confidently identified.
+ * When no year is found, returns the current year so the vehicle-aware
+ * fetcher can still attempt navigation (it tries ±3 years anyway).
  */
 export function extractVehicleHint(title: string): VehicleHint | null {
   const lower = title.toLowerCase();
@@ -133,18 +193,18 @@ export function extractVehicleHint(title: string): VehicleHint | null {
   if (year4Match) {
     year = year4Match[1];
   } else {
-    // 2. Fall back to 2-digit year range like "07-14" or "'98" — common in repair video titles
-    // Match YY-YY ranges (e.g. "07-14"), bare YY after apostrophe ("'98"),
-    // or YY near a make/model word. Take the first (earlier) year in a range.
+    // 2. Fall back to 2-digit year range like "07-14" or "'98".
+    // Take the first (earlier) year — fetcher tries +3 offsets anyway.
     const year2Match = lower.match(/(?:^|[\s'(])([6-9]\d|0\d|1\d|2[0-6])(?:-\d{2})?(?=\s|$)/);
     if (year2Match) {
       year = expandTwoDigitYear(year2Match[1]);
     }
   }
 
-  // Check aliases first (multi-word before single-word)
+  // Check aliases first (longest multi-word first to avoid partial matches)
   let make: string | null = null;
-  for (const [alias, canonical] of Object.entries(MAKE_ALIASES)) {
+  const sortedAliases = Object.entries(MAKE_ALIASES).sort((a, b) => b[0].length - a[0].length);
+  for (const [alias, canonical] of sortedAliases) {
     if (lower.includes(alias)) { make = canonical; break; }
   }
 
@@ -156,18 +216,34 @@ export function extractVehicleHint(title: string): VehicleHint | null {
     }
   }
 
-  if (!make || !year) return null;
+  if (!make) return null;
 
-  // Grab the words that appear after the make in the title — these are the model hint
-  const makeIdx = lower.indexOf(make.toLowerCase());
-  const afterMake = title.slice(makeIdx + make.length).trim();
-  const modelWords = afterMake
+  // If no year was found but we have a make, use the current year as a starting
+  // point — fetchLemonManualsVehicle tries offsets in both directions.
+  if (!year) {
+    year = String(new Date().getFullYear());
+  }
+
+  // Grab model words from the full title (not just after the make) by stripping
+  // known noise words and the make/year tokens themselves.
+  const titleWords = title
     .replace(/[^\w\s]/g, ' ')
     .split(/\s+/)
-    .filter((w) => w.length > 1 && !/^\d{4}$/.test(w))  // drop 4-digit years
-    .slice(0, 5);
+    .filter((w) => {
+      const wl = w.toLowerCase();
+      return (
+        w.length > 1 &&
+        !/^\d{4}$/.test(w) &&                     // drop 4-digit years
+        !/^\d{2}$/.test(w) &&                     // drop 2-digit years
+        wl !== make!.toLowerCase() &&
+        !['how', 'to', 'diy', 'the', 'a', 'an', 'on', 'for', 'my', 'your',
+          'fix', 'repair', 'replace', 'install', 'change', 'easy', 'quick',
+          'step', 'guide', 'tutorial', 'with', 'and', 'in', 'at'].includes(wl)
+      );
+    })
+    .slice(0, 6);
 
-  return { make, year, modelWords };
+  return { make, year, modelWords: titleWords };
 }
 
 // ---------------------------------------------------------------------------
@@ -283,14 +359,70 @@ function extractManualImages(html: string, caption: string): ManualImage[] {
   return images;
 }
 
+// Synonym expansion: maps a keyword to related terms likely found in section slugs.
+const REPAIR_SYNONYMS: Record<string, string[]> = {
+  brake:      ['disc', 'caliper', 'rotor', 'drum', 'pad', 'shoe', 'brake'],
+  brakes:     ['disc', 'caliper', 'rotor', 'drum', 'pad', 'shoe', 'brake'],
+  caliper:    ['brake', 'disc', 'caliper'],
+  rotor:      ['disc', 'rotor', 'brake'],
+  pad:        ['brake', 'pad', 'disc'],
+  oil:        ['engine', 'lubrication', 'drain', 'filter', 'sump', 'oil'],
+  coolant:    ['cooling', 'radiator', 'thermostat', 'coolant', 'antifreeze'],
+  radiator:   ['cooling', 'radiator', 'coolant'],
+  thermostat: ['cooling', 'thermostat', 'coolant'],
+  timing:     ['timing', 'chain', 'belt', 'tensioner', 'camshaft'],
+  chain:      ['timing', 'chain', 'tensioner'],
+  belt:       ['timing', 'serpentine', 'belt', 'tensioner', 'drive'],
+  spark:      ['ignition', 'spark', 'plug', 'coil'],
+  plug:       ['spark', 'plug', 'ignition'],
+  ignition:   ['ignition', 'coil', 'spark', 'plug'],
+  coil:       ['coil', 'ignition', 'spark'],
+  fuel:       ['fuel', 'injector', 'pump', 'filter', 'rail'],
+  injector:   ['fuel', 'injector'],
+  pump:       ['fuel', 'pump', 'water', 'coolant'],
+  starter:    ['starter', 'cranking', 'electrical'],
+  alternator: ['alternator', 'charging', 'electrical'],
+  battery:    ['battery', 'electrical', 'charging'],
+  transmission: ['transmission', 'transaxle', 'gear', 'shift'],
+  transfer:   ['transfer', 'case', 'drivetrain'],
+  axle:       ['axle', 'shaft', 'cv', 'drivetrain'],
+  suspension: ['suspension', 'strut', 'shock', 'spring', 'control', 'arm'],
+  strut:      ['strut', 'suspension', 'shock', 'spring'],
+  shock:      ['shock', 'strut', 'suspension'],
+  bearing:    ['bearing', 'hub', 'wheel'],
+  wheel:      ['wheel', 'hub', 'bearing'],
+  steering:   ['steering', 'rack', 'tie', 'rod', 'column'],
+  exhaust:    ['exhaust', 'manifold', 'muffler', 'catalytic'],
+  catalytic:  ['catalytic', 'exhaust', 'converter'],
+  oxygen:     ['oxygen', 'sensor', 'o2', 'exhaust'],
+  sensor:     ['sensor'],
+  valve:      ['valve', 'valvetrain', 'head', 'cover'],
+  head:       ['head', 'cylinder', 'gasket', 'valve'],
+  gasket:     ['gasket', 'seal', 'head'],
+  seal:       ['seal', 'gasket', 'leak'],
+  window:     ['window', 'regulator', 'motor', 'glass'],
+  door:       ['door', 'latch', 'lock', 'hinge'],
+  hvac:       ['hvac', 'air', 'conditioning', 'heater', 'blower'],
+  ac:         ['air', 'conditioning', 'compressor', 'hvac'],
+  heat:       ['heater', 'core', 'hvac', 'blower'],
+};
+
 /**
  * Score a section link by keyword relevance to the repair topic.
+ * Expands keywords through a synonym map so e.g. "caliper" matches
+ * "Front Disc Brakes" sections even though "caliper" isn't in the URL.
  */
 function scoreSectionLink(url: string, keywordsLower: string[]): number {
   const decoded = decodeURIComponent(url).toLowerCase();
   let score = 0;
   for (const kw of keywordsLower) {
-    if (decoded.includes(kw)) score++;
+    // Direct match
+    if (decoded.includes(kw)) { score += 2; continue; }
+    // Synonym expansion
+    const synonyms = REPAIR_SYNONYMS[kw] ?? [];
+    for (const syn of synonyms) {
+      if (decoded.includes(syn)) { score += 1; break; }
+    }
   }
   return score;
 }
@@ -307,13 +439,17 @@ export async function fetchLemonManualsVehicle(
   const empty: LemonManualsResult = { text: '', images: [], links: [] };
   try {
     // ── 1. Fetch the make/year listing to find exact model URLs ──────────
-    // Try the extracted year first; if that yields no models (e.g. the title
-    // said "07-14" and 2007 isn't on Lemon), try up to 3 subsequent years.
+    // Try the extracted year first, then ±3 years (forward then backward)
+    // so "07-14" titles that resolve to 2007 still find 2008, 2009, etc.,
+    // and year-missing titles starting at current year also find nearby years.
     let resolvedYear = vehicle.year;
     let modelLinks: string[] = [];
 
-    for (let offset = 0; offset <= 3; offset++) {
-      const tryYear = String(parseInt(vehicle.year, 10) + offset);
+    const baseYear = parseInt(vehicle.year, 10);
+    const offsets = [0, 1, -1, 2, -2, 3, -3];
+    for (const offset of offsets) {
+      const tryYear = String(baseYear + offset);
+      if (parseInt(tryYear, 10) < 1960 || parseInt(tryYear, 10) > new Date().getFullYear() + 1) continue;
       const tryUrl = `${LEMON_BASE}/${encodeURIComponent(vehicle.make)}/${tryYear}/`;
       try {
         const html = await fetchWithTimeout(tryUrl);
@@ -321,7 +457,7 @@ export async function fetchLemonManualsVehicle(
         if (links.length > 0) {
           resolvedYear = tryYear;
           modelLinks = links;
-          if (offset > 0) console.log(`lemon-manuals: year ${vehicle.year} had no models, using ${tryYear}`);
+          if (offset !== 0) console.log(`lemon-manuals: year ${vehicle.year} had no models, using ${tryYear}`);
           break;
         }
       } catch { /* try next year */ }
@@ -341,9 +477,43 @@ export async function fetchLemonManualsVehicle(
     const bestModel = scored[0].url;
     console.log(`lemon-manuals: ${vehicle.make} ${resolvedYear} — matched model → ${decodeURIComponent(bestModel)} (score ${scored[0].score})`);
 
-    // ── 3. Fetch the single-page repair index ────────────────────────────
-    const repairIndexUrl = `${bestModel}Repair%20and%20Diagnosis%20%28Single%20Page%29/`;
-    const indexHtml = await fetchWithTimeout(repairIndexUrl);
+    // ── 3. Fetch the single-page repair index (with fallbacks) ──────────
+    // Try the single-page index first; if it 404s or is empty, try the
+    // regular repair index, then fall back to the bare model page.
+    const indexCandidates = [
+      `${bestModel}Repair%20and%20Diagnosis%20%28Single%20Page%29/`,
+      `${bestModel}Repair%20and%20Diagnosis/`,
+      bestModel,
+    ];
+    let indexHtml = '';
+    let repairIndexUrl = indexCandidates[0];
+    for (const candidate of indexCandidates) {
+      try {
+        const html = await fetchWithTimeout(candidate);
+        const links = parseSectionLinks(html, bestModel);
+        if (links.length > 0) {
+          indexHtml = html;
+          repairIndexUrl = candidate;
+          if (candidate !== indexCandidates[0]) {
+            console.log(`lemon-manuals: single-page index not found, using ${candidate}`);
+          }
+          break;
+        }
+      } catch { /* try next candidate */ }
+    }
+
+    if (!indexHtml) {
+      console.warn(`lemon-manuals: could not load any repair index for ${bestModel}`);
+      // Still surface the vehicle and index links even if we can't fetch sections
+      return {
+        text: '',
+        images: [],
+        links: [
+          { url: bestModel, label: `${vehicle.make} ${resolvedYear} — Service Manual` },
+          { url: indexCandidates[0], label: 'Full Repair & Diagnosis Index' },
+        ],
+      };
+    }
 
     // ── 4. Extract and score all section links ────────────────────────────
     const repairKeywords = repairQuery
@@ -356,11 +526,11 @@ export async function fetchLemonManualsVehicle(
       .map((url) => ({ url, score: scoreSectionLink(url, repairKeywords) }))
       .filter((s) => s.score > 0)
       .sort((a, b) => b.score - a.score)
-      .slice(0, 4);  // top 4 most relevant sections
+      .slice(0, 8);  // top 8 most relevant sections
 
     if (rankedSections.length === 0) {
       // No keyword hits — fall back to the first few sections (common specs etc.)
-      rankedSections.push(...sectionLinks.slice(0, 2).map((url) => ({ url, score: 0 })));
+      rankedSections.push(...sectionLinks.slice(0, 3).map((url) => ({ url, score: 0 })));
     }
 
     console.log(`lemon-manuals: fetching ${rankedSections.length} sections for "${repairQuery}"`);
@@ -496,45 +666,56 @@ export async function fetchIFixit(query: string): Promise<string> {
 /**
  * Generic keyword search on lemon-manuals.la.
  * Used as a fallback when no make/year can be extracted from the title.
+ * Returns a full LemonManualsResult so links surface in the UI sidebar.
  */
-export async function fetchLemonManuals(query: string): Promise<string> {
-  const BASE = LEMON_BASE;
+export async function fetchLemonManuals(query: string): Promise<LemonManualsResult> {
+  const empty: LemonManualsResult = { text: '', images: [], links: [] };
   try {
-    const homeHtml = await fetchWithTimeout(BASE).catch(() => '');
-    const searchBase = homeHtml ? detectSearchUrl(BASE, homeHtml) : `${BASE}/?s=`;
+    const homeHtml = await fetchWithTimeout(LEMON_BASE).catch(() => '');
+    const searchBase = homeHtml ? detectSearchUrl(LEMON_BASE, homeHtml) : `${LEMON_BASE}/?s=`;
 
     const searchUrl = `${searchBase}${encodeURIComponent(query)}`;
     const searchHtml = await fetchWithTimeout(searchUrl);
 
     const linkPattern = /href=["'](https?:\/\/lemon-manuals\.la\/[^"'#?]+)["']/gi;
-    const links: string[] = [];
+    const foundLinks: string[] = [];
     let m: RegExpExecArray | null;
-    while ((m = linkPattern.exec(searchHtml)) !== null && links.length < 3) {
+    while ((m = linkPattern.exec(searchHtml)) !== null && foundLinks.length < 4) {
       const href = m[1];
       if (/\/(category|tag|page|author|feed)\//i.test(href)) continue;
-      if (!links.includes(href)) links.push(href);
+      if (!foundLinks.includes(href)) foundLinks.push(href);
     }
 
     const chunks: string[] = [];
+    const manualLinks: ManualLink[] = [];
 
     const searchText = extractMainText(searchHtml).slice(0, MAX_CONTENT_CHARS / 2);
     if (searchText.length > 100) chunks.push(`[lemon-manuals.la search results]\n${searchText}`);
 
-    for (const link of links.slice(0, 2)) {
+    for (const link of foundLinks.slice(0, 3)) {
       try {
         const pageHtml = await fetchWithTimeout(link);
         const text = extractMainText(pageHtml).slice(0, MAX_CONTENT_CHARS / 2);
-        if (text.length > 100) chunks.push(`[lemon-manuals.la: ${link}]\n${text}`);
+        if (text.length > 100) {
+          chunks.push(`[lemon-manuals.la: ${link}]\n${text}`);
+          // Derive a readable label from the URL path
+          const pathLabel = decodeURIComponent(link.replace(LEMON_BASE, '').replace(/^\/|\/$/g, '').replace(/\//g, ' › '));
+          manualLinks.push({ url: link, label: pathLabel || link });
+        }
       } catch {
         // ignore individual page fetch failures
       }
     }
 
-    if (chunks.length === 0) return '';
-    console.log(`lemon-manuals.la search: ${chunks.join('').length} chars for "${query}"`);
-    return chunks.join('\n\n').slice(0, MAX_CONTENT_CHARS);
+    if (chunks.length === 0) return empty;
+    console.log(`lemon-manuals.la search: ${chunks.join('').length} chars, ${manualLinks.length} links for "${query}"`);
+    return {
+      text: chunks.join('\n\n').slice(0, MAX_CONTENT_CHARS),
+      images: [],
+      links: manualLinks,
+    };
   } catch (err) {
     console.warn('lemon-manuals.la fetch skipped:', err instanceof Error ? err.message : err);
-    return '';
+    return empty;
   }
 }
