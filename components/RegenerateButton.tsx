@@ -10,10 +10,11 @@ export function RegenerateButton({ onRegenerate, disabled }: Props) {
     <button
       onClick={onRegenerate}
       disabled={disabled}
-      className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border bg-white border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      className="inline-flex items-center gap-1.5 text-label-caps text-xs px-3 py-1.5 rounded border border-surface-container-highest bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       title="Regenerate this guide from scratch (bypasses cache)"
     >
-      ↻ Regenerate
+      <span className="material-symbols-outlined text-sm">refresh</span>
+      REGENERATE
     </button>
   );
 }
