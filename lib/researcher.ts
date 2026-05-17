@@ -42,6 +42,9 @@ export interface ResearchResult {
   text: string;
   manualImages: ManualImage[];
   manualLinks: ManualLink[];
+  /** Full section URL list from the Lemon index — used to match guide steps post-generation */
+  sectionIndex: string[];
+  vehicleBaseUrl: string;
 }
 
 export async function researchRepairTopic(
@@ -65,7 +68,7 @@ export async function researchRepairTopic(
   // Fallback does a generic keyword search.
   const lemonFetch = vehicle
     ? fetchLemonManualsVehicle(vehicle, searchQuery)
-    : fetchLemonManuals(searchQuery);
+    : fetchLemonManuals(searchQuery).then((text) => ({ text, images: [], links: [], sectionIndex: [], vehicleBaseUrl: '' }));
 
   const [lemonResult, ifixitContent, aiResult] = await Promise.all([
     lemonFetch,
@@ -96,6 +99,8 @@ export async function researchRepairTopic(
     text: parts.join('\n'),
     manualImages: lemonResult.images ?? [],
     manualLinks: lemonResult.links ?? [],
+    sectionIndex: lemonResult.sectionIndex ?? [],
+    vehicleBaseUrl: lemonResult.vehicleBaseUrl ?? '',
   };
 }
 

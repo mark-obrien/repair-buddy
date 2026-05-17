@@ -169,6 +169,10 @@ export interface LemonManualsResult {
   text: string;
   images: ManualImage[];
   links: ManualLink[];
+  /** All section URLs from the single-page repair index — used post-generation to match step titles */
+  sectionIndex: string[];
+  /** Base URL of the matched vehicle variant, e.g. https://lemon-manuals.la/Chevrolet/2007/Suburban%20K1500.../  */
+  vehicleBaseUrl: string;
 }
 
 /**
@@ -438,7 +442,7 @@ export async function fetchLemonManualsVehicle(
   vehicle: VehicleHint,
   repairQuery: string
 ): Promise<LemonManualsResult> {
-  const empty: LemonManualsResult = { text: '', images: [], links: [] };
+  const empty: LemonManualsResult = { text: '', images: [], links: [], sectionIndex: [], vehicleBaseUrl: '' };
   try {
     // ── 1. Fetch the make/year listing to find exact model URLs ──────────
     // Try the extracted year first, then ±3 years (forward then backward)
@@ -623,6 +627,8 @@ export async function fetchLemonManualsVehicle(
       text: combined.slice(0, MAX_CONTENT_CHARS * 2),
       images: uniqueImages.slice(0, 12),
       links: manualLinks,
+      sectionIndex: sectionLinks,   // full list for post-generation step matching
+      vehicleBaseUrl: bestModel,
     };
 
   } catch (err) {

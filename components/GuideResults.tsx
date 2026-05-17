@@ -337,14 +337,16 @@ export function GuideResults({ guide, frames = [], provider = 'anthropic', model
                 {/* OEM manual links */}
                 {guide.manualLinks && guide.manualLinks.length > 0 && (() => {
                   const byGroup = {
-                    vehicle:      guide.manualLinks.filter(l => l.group === 'vehicle'),
+                    vehicle:        guide.manualLinks.filter(l => l.group === 'vehicle'),
                     'quick-lookup': guide.manualLinks.filter(l => l.group === 'quick-lookup'),
-                    section:      guide.manualLinks.filter(l => l.group === 'section'),
+                    section:        guide.manualLinks.filter(l => l.group === 'section'),
+                    step:           guide.manualLinks.filter(l => l.group === 'step'),
                   };
                   const groups: Array<{ key: string; label: string; links: typeof guide.manualLinks }> = [
-                    { key: 'vehicle',       label: 'Manual',        links: byGroup.vehicle },
-                    { key: 'quick-lookup',  label: 'Quick Lookups', links: byGroup['quick-lookup'] },
-                    { key: 'section',       label: 'Repair Sections Found', links: byGroup.section },
+                    { key: 'vehicle',       label: 'Manual',             links: byGroup.vehicle },
+                    { key: 'quick-lookup',  label: 'Quick Lookups',      links: byGroup['quick-lookup'] },
+                    { key: 'section',       label: 'Repair Sections',    links: byGroup.section },
+                    { key: 'step',          label: 'Referenced in Steps', links: byGroup.step },
                   ].filter(g => g.links && g.links.length > 0);
 
                   return (

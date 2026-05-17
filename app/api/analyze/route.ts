@@ -16,6 +16,59 @@ import { getCachedGuide, cacheGuide } from '@/lib/db';
 export const maxDuration = 60;
 export const runtime = 'nodejs';
 
+// ---------------------------------------------------------------------------
+// Match repair step titles against the Lemon Manuals section index
+// ---------------------------------------------------------------------------
+
+const STEP_STOP_WORDS = new Set([
+  'the', 'and', 'from', 'with', 'this', 'that', 'into', 'onto', 'your',
+  'make', 'sure', 'will', 'have', 'when', 'then', 'using', 'apply', 'check',
+  'ensure', 'verify', 'each', 'both', 'all', 'any', 'new', 'old',
+]);
+
+function matchStepLinks(
+  steps: Array<{ title: string; description: string }>,
+  sectionIndex: string[],
+  vehicleBaseUrl: string,
+): Array<{ url: string; label: string; group: 'step'; icon: string }> {
+  const results: Array<{ url: string; label: string; group: 'step'; icon: string }> = [];
+  const usedUrls = new Set<string>();
+
+  for (const step of steps) {
+    // Keywords from both title and first sentence of description
+    const text = `${step.title} ${step.description.split('.')[0]}`.toLowerCase();
+    const keywords = text
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length >= 4 && !STEP_STOP_WORDS.has(w));
+
+    if (keywords.length === 0) continue;
+
+    // Score each section URL
+    let best: { url: string; score: number } | null = null;
+    for (const url of sectionIndex) {
+      const decoded = decodeURIComponent(url.replace(vehicleBaseUrl, '')).toLowerCase();
+      let score = 0;
+      for (const kw of keywords) {
+        if (decoded.includes(kw)) score++;
+      }
+      if (score > 0 && (!best || score > best.score)) {
+        best = { url, score };
+      }
+    }
+
+    if (best && !usedUrls.has(best.url)) {
+      usedUrls.add(best.url);
+      // Decode last path segment as label
+      const decoded = decodeURIComponent(best.url.replace(vehicleBaseUrl, '').replace(/\/$/, ''));
+      const label = decoded.split('/').filter(Boolean).pop() ?? decoded;
+      results.push({ url: best.url, label, group: 'step', icon: 'link' });
+    }
+  }
+
+  return results.slice(0, 10); // cap at 10 step links
+}
+
 const FRAME_TIMEOUT_MS = 25_000;
 
 async function tryExtractFrames(videoUrl: string, durationSeconds: number): Promise<string[]> {
@@ -118,6 +171,8 @@ export async function POST(request: Request) {
   const researchContext = researchResult.text;
   const manualImageUrls = researchResult.manualImages;
   const manualLinks = researchResult.manualLinks;
+  const sectionIndex = researchResult.sectionIndex;
+  const vehicleBaseUrl = researchResult.vehicleBaseUrl;
 
   if (researchContext) console.log(`Research context: ${researchContext.length} chars`);
   if (manualImageUrls.length) console.log(`Manual diagrams found: ${manualImageUrls.length}`);
@@ -166,8 +221,15 @@ export async function POST(request: Request) {
       guide.manualDiagrams = manualDiagrams;
       console.log(`Attached ${manualDiagrams.length} OEM diagrams to guide`);
     }
-    if (manualLinks.length > 0) {
-      guide.manualLinks = manualLinks;
+
+    // Match repair steps against the Lemon section index to surface relevant pages
+    const stepLinks = sectionIndex.length > 0
+      ? matchStepLinks(guide.repairSteps, sectionIndex, vehicleBaseUrl)
+      : [];
+
+    if (manualLinks.length > 0 || stepLinks.length > 0) {
+      guide.manualLinks = [...manualLinks, ...stepLinks];
+      if (stepLinks.length > 0) console.log(`Matched ${stepLinks.length} step-specific manual links`);
     }
 
     const responsePayload = {
