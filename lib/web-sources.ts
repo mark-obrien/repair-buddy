@@ -95,15 +95,36 @@ export interface VehicleHint {
 }
 
 /**
+ * Convert a 2-digit year string to a full 4-digit year.
+ * 60-99 → 1960-1999, 00-26 → 2000-2026.
+ */
+function expandTwoDigitYear(twoDigit: string): string {
+  const n = parseInt(twoDigit, 10);
+  return n >= 60 ? `19${twoDigit}` : `20${twoDigit.padStart(2, '0')}`;
+}
+
+/**
  * Extract make, year, and likely model words from a video title.
+ * Handles both 4-digit years ("2014") and 2-digit year ranges ("07-14").
  * Returns null if no make/year can be confidently identified.
  */
 export function extractVehicleHint(title: string): VehicleHint | null {
   const lower = title.toLowerCase();
 
-  // Year: 4-digit number in plausible range
-  const yearMatch = lower.match(/\b(19[6-9]\d|20[0-2]\d)\b/);
-  const year = yearMatch?.[1];
+  // 1. Try 4-digit year first (most common: "2022 Honda Civic")
+  let year: string | undefined;
+  const year4Match = lower.match(/\b(19[6-9]\d|20[0-2]\d)\b/);
+  if (year4Match) {
+    year = year4Match[1];
+  } else {
+    // 2. Fall back to 2-digit year range like "07-14" or "'98" — common in repair video titles
+    // Match YY-YY ranges (e.g. "07-14"), bare YY after apostrophe ("'98"),
+    // or YY near a make/model word. Take the first (earlier) year in a range.
+    const year2Match = lower.match(/(?:^|[\s'(])([6-9]\d|0\d|1\d|2[0-6])(?:-\d{2})?(?=\s|$)/);
+    if (year2Match) {
+      year = expandTwoDigitYear(year2Match[1]);
+    }
+  }
 
   // Check aliases first (multi-word before single-word)
   let make: string | null = null;
@@ -229,23 +250,39 @@ export async function fetchLemonManualsVehicle(
 ): Promise<string> {
   try {
     // ── 1. Fetch the make/year listing to find exact model URLs ──────────
-    const listingUrl = `${LEMON_BASE}/${encodeURIComponent(vehicle.make)}/${vehicle.year}/`;
-    const listingHtml = await fetchWithTimeout(listingUrl);
-    const modelLinks = parseModelLinks(listingHtml, vehicle.make, vehicle.year);
+    // Try the extracted year first; if that yields no models (e.g. the title
+    // said "07-14" and 2007 isn't on Lemon), try up to 3 subsequent years.
+    let resolvedYear = vehicle.year;
+    let modelLinks: string[] = [];
+
+    for (let offset = 0; offset <= 3; offset++) {
+      const tryYear = String(parseInt(vehicle.year, 10) + offset);
+      const tryUrl = `${LEMON_BASE}/${encodeURIComponent(vehicle.make)}/${tryYear}/`;
+      try {
+        const html = await fetchWithTimeout(tryUrl);
+        const links = parseModelLinks(html, vehicle.make, tryYear);
+        if (links.length > 0) {
+          resolvedYear = tryYear;
+          modelLinks = links;
+          if (offset > 0) console.log(`lemon-manuals: year ${vehicle.year} had no models, using ${tryYear}`);
+          break;
+        }
+      } catch { /* try next year */ }
+    }
 
     if (modelLinks.length === 0) {
-      console.warn(`lemon-manuals: no model links found at ${listingUrl}`);
+      console.warn(`lemon-manuals: no model links found for ${vehicle.make} ${vehicle.year}±3`);
       return '';
     }
 
     // ── 2. Pick the best-matching model URL ──────────────────────────────
-    const titleLower = repairQuery.toLowerCase();
+    const titleLower = (vehicle.modelWords.join(' ') + ' ' + repairQuery).toLowerCase();
     const scored = modelLinks
       .map((url) => ({ url, score: scoreModelUrl(url, vehicle.modelWords, titleLower) }))
       .sort((a, b) => b.score - a.score);
 
     const bestModel = scored[0].url;
-    console.log(`lemon-manuals: matched model → ${decodeURIComponent(bestModel)} (score ${scored[0].score})`);
+    console.log(`lemon-manuals: ${vehicle.make} ${resolvedYear} — matched model → ${decodeURIComponent(bestModel)} (score ${scored[0].score})`);
 
     // ── 3. Fetch the single-page repair index ────────────────────────────
     const repairIndexUrl = `${bestModel}Repair%20and%20Diagnosis%20%28Single%20Page%29/`;
