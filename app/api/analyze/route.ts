@@ -197,8 +197,20 @@ export async function POST(request: Request) {
     }
     if (msg.includes('overloaded') || msg.includes('529') || msg.includes('503')) {
       return NextResponse.json(
-        { error: 'AI service is temporarily overloaded. Please try again.' },
+        { error: 'AI service is temporarily overloaded. Please try again in a moment.' },
         { status: 503 }
+      );
+    }
+    if (msg.includes('rate limit') || msg.includes('429')) {
+      return NextResponse.json(
+        { error: 'Rate limit hit. Please wait a moment and try again.' },
+        { status: 429 }
+      );
+    }
+    if (msg.includes('context') || msg.includes('too long') || msg.includes('maximum')) {
+      return NextResponse.json(
+        { error: 'Video transcript is too long for this model. Try a shorter video or a different model.' },
+        { status: 422 }
       );
     }
     return NextResponse.json(

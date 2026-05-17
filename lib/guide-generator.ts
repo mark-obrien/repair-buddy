@@ -213,44 +213,65 @@ export async function generateRepairGuide(
     mimeType: 'image/jpeg' as const,
   }));
 
-  async function callModel(schema: typeof repairGuideSchema, attempt: number) {
-    const res = await generateText({
-      model,
-      maxTokens: 16000,
-      system: SYSTEM_PROMPT,
-      tools: {
-        generate_repair_guide: tool({
-          description: 'Extract structured repair guide data from the video transcript, research context, comments, and video frames.',
-          parameters: schema,
-        }),
-      },
-      toolChoice: { type: 'tool', toolName: 'generate_repair_guide' },
-      messages: [
-        {
-          role: 'user',
-          content: [{ type: 'text', text: userText }, ...imageContent],
+  async function callModel(
+    schema: typeof repairGuideSchema,
+    attempt: number,
+    frameSubset: string[] = imageContent,
+  ) {
+    let res;
+    try {
+      res = await generateText({
+        model,
+        maxTokens: 16000,
+        system: SYSTEM_PROMPT,
+        tools: {
+          generate_repair_guide: tool({
+            description: 'Extract structured repair guide data from the video transcript, research context, comments, and video frames.',
+            parameters: schema,
+          }),
         },
-      ],
-      abortSignal: undefined,
-    });
-    console.log(`Guide generation attempt ${attempt}: finishReason=${res.finishReason} toolCalls=${res.toolCalls.length}`);
+        toolChoice: { type: 'tool', toolName: 'generate_repair_guide' },
+        messages: [
+          {
+            role: 'user',
+            content: [{ type: 'text', text: userText }, ...frameSubset],
+          },
+        ],
+        abortSignal: undefined,
+      });
+    } catch (err) {
+      // AI SDK threw — surface the real error message
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`API error on attempt ${attempt}: ${msg}`);
+    }
+
+    const warnings = (res as any).warnings;
+    if (warnings?.length) console.warn(`Attempt ${attempt} warnings:`, warnings);
+    console.log(`Guide generation attempt ${attempt}: finishReason=${res.finishReason} toolCalls=${res.toolCalls.length} frames=${frameSubset.length}`);
     return res;
   }
 
-  // First attempt — full schema
+  // Attempt 1 — full schema + all frames
   let result = await callModel(repairGuideSchema, 1);
 
-  // If truncated or no tool call, retry without the heavy SVG diagram field
-  if (!result.toolCalls[0] || result.finishReason === 'length') {
+  // Attempt 2 — drop heavy SVG field if truncated or model errored
+  if (!result.toolCalls[0] || result.finishReason === 'length' || result.finishReason === 'error') {
     console.warn(`Retrying without partsDiagram (finishReason=${result.finishReason})`);
     const reducedSchema = repairGuideSchema.omit({ partsDiagram: true });
     result = await callModel(reducedSchema as typeof repairGuideSchema, 2);
   }
 
+  // Attempt 3 — drop images entirely if still failing (transcript-only fallback)
+  if (!result.toolCalls[0] || result.finishReason === 'error') {
+    console.warn(`Retrying with no frames (finishReason=${result.finishReason})`);
+    const reducedSchema = repairGuideSchema.omit({ partsDiagram: true, frameAnnotations: true });
+    result = await callModel(reducedSchema as typeof repairGuideSchema, 3, []);
+  }
+
   const toolCall = result.toolCalls[0];
   if (!toolCall) {
     throw new Error(
-      `Model did not return structured repair guide data (finishReason=${result.finishReason}, text length=${result.text?.length ?? 0}).`
+      `Model did not return structured repair guide data after 3 attempts (finishReason=${result.finishReason}, text length=${result.text?.length ?? 0}).`
     );
   }
 
