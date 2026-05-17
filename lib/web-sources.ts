@@ -561,23 +561,46 @@ export async function fetchLemonManualsVehicle(
     const combined = sectionTexts.filter(Boolean).join('\n\n');
     const uniqueImages = allImages.filter((img, i, arr) => arr.findIndex(x => x.url === img.url) === i);
 
-    // Build the full set of useful links using the known URL patterns
-    const bundleUrl = bestModel.replace(LEMON_BASE + '/', LEMON_BASE + '/bundle/');
+    // Build links from what we know actually exists
+    const bundleUrl = `${LEMON_BASE}/bundle/${bestModel.replace(LEMON_BASE + '/', '')}`;
 
+    // Vehicle-level links — these always exist once we have a valid bestModel
     const vehicleLinks: ManualLink[] = [
-      { url: bestModel,    label: `${vehicle.make} ${resolvedYear} Service Manual`, group: 'vehicle', icon: 'home_repair_service' },
-      { url: repairIndexUrl, label: 'Full Repair & Diagnosis (searchable)', group: 'vehicle', icon: 'list' },
-      { url: `${bestModel}Labor%20Times/`, label: 'Labor Times', group: 'vehicle', icon: 'schedule' },
-      { url: bundleUrl, label: 'Download Offline ZIP', group: 'vehicle', icon: 'download' },
+      { url: bestModel,      label: `${vehicle.make} ${resolvedYear} Service Manual`, group: 'vehicle', icon: 'home_repair_service' },
+      { url: repairIndexUrl, label: 'Full Repair & Diagnosis (searchable)',            group: 'vehicle', icon: 'list' },
+      { url: `${bestModel}Labor%20Times/`, label: 'Labor Times',                       group: 'vehicle', icon: 'schedule' },
+      { url: bundleUrl,      label: 'Download Offline ZIP',                            group: 'vehicle', icon: 'download' },
     ];
 
-    const quickLookupLinks: ManualLink[] = [
-      { url: `${bestModel}Repair%20and%20Diagnosis/Quick%20Lookups/Fluids/`, label: 'Fluids & Capacities', group: 'quick-lookup', icon: 'water_drop' },
-      { url: `${bestModel}Repair%20and%20Diagnosis/Quick%20Lookups/DTC%20Index/`, label: 'DTC / Trouble Codes', group: 'quick-lookup', icon: 'error_outline' },
-      { url: `${bestModel}Repair%20and%20Diagnosis/Quick%20Lookups/Wiring%20Diagrams/System%20Wiring%20Diagrams/`, label: 'Wiring Diagrams', group: 'quick-lookup', icon: 'cable' },
-      { url: `${bestModel}Repair%20and%20Diagnosis/Quick%20Lookups/Technical%20Bulletins/Technical%20Service%20Bulletins/`, label: 'TSBs', group: 'quick-lookup', icon: 'campaign' },
-      { url: `${bestModel}Repair%20and%20Diagnosis/Quick%20Lookups/Technical%20Bulletins/Safety%20Recalls/`, label: 'Safety Recalls', group: 'quick-lookup', icon: 'warning' },
-    ];
+    // Quick lookup links — extracted from the single-page index HTML we already have,
+    // so we only include links that are actually present for this vehicle.
+    const QUICK_LOOKUP_MAP: Record<string, { label: string; icon: string }> = {
+      'Quick%20Lookups/Fluids':              { label: 'Fluids & Capacities',  icon: 'water_drop'   },
+      'Quick%20Lookups/DTC%20Index':         { label: 'DTC / Trouble Codes',  icon: 'error_outline' },
+      'Quick%20Lookups/Wiring%20Diagrams':   { label: 'Wiring Diagrams',      icon: 'cable'         },
+      'Technical%20Service%20Bulletins':     { label: 'TSBs',                 icon: 'campaign'      },
+      'Quick%20Lookups/Technical%20Bulletins/Safety%20Recalls': { label: 'Safety Recalls', icon: 'warning' },
+      'Common%20Specs':                      { label: 'Common Specs',         icon: 'tune'          },
+    };
+
+    const quickLookupLinks: ManualLink[] = [];
+    const seenQuickLabels = new Set<string>();
+    // Walk all hrefs in the index HTML and match against known quick-lookup patterns
+    const qlPattern = /href=["']([^"'#?]+)["']/gi;
+    let qlMatch: RegExpExecArray | null;
+    while ((qlMatch = qlPattern.exec(indexHtml)) !== null) {
+      let href = qlMatch[1];
+      if (href.startsWith('/')) href = `${LEMON_BASE}${href}`;
+      if (!href.startsWith(bestModel)) continue;
+      const relative = href.replace(bestModel, '');
+      for (const [pattern, meta] of Object.entries(QUICK_LOOKUP_MAP)) {
+        if (relative.includes(pattern) && !seenQuickLabels.has(meta.label)) {
+          quickLookupLinks.push({ url: href, label: meta.label, group: 'quick-lookup', icon: meta.icon });
+          seenQuickLabels.add(meta.label);
+          break;
+        }
+      }
+    }
 
     function sectionLabel(url: string): string {
       const decoded = decodeURIComponent(url.replace(bestModel, '').replace(/\/$/, ''));
