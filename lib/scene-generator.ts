@@ -61,8 +61,8 @@ O-ring (torus, outer radius = width/2):        width 2–4, height 0.3–0.6, de
 Sensor / switch:                               0.8 × 1.5 × 0.8
 
 ━━━ COLORS — use exactly these hex values ━━━
-primary    #f97316   the main component being repaired or replaced
-structural #94a3b8   housings, blocks, brackets, frames
+primary    #004cca   the main component being repaired or replaced
+structural #51585e   housings, blocks, brackets, frames
 fastener   #ca8a04   bolts, nuts, clips, retaining rings
 seal       #16a34a   gaskets, O-rings, seals, boots
 sensor     #2563eb   sensors, switches, solenoids, connectors
@@ -77,7 +77,7 @@ rotating   #9333ea   gears, pulleys, shafts, camshafts, drive belts
 • Fasteners: cluster 2–3 units away from the surface they fasten; spread as a group
 • For repeated fasteners (4 bolts), place them in a small cluster not all at one point
 
-Generate 6–14 components. Use the frames to infer actual 3D shapes and spatial relationships. Write a one-sentence description for each component.`;
+Generate 6–14 components. Use the video frames to understand what the technician is working on and the OEM service manual diagrams (when provided) as the authoritative reference for part geometry, spatial relationships, and assembly order. OEM diagrams show the real engineering layout — trust them over ambiguous frame shots. Write a one-sentence description for each component.`;
 
 // ---------------------------------------------------------------------------
 // Guide context passed from client (slimmed-down subset of RepairGuide)
@@ -97,7 +97,8 @@ export async function generateScene3D(
   frames: string[],
   guide: SceneGuideContext,
   providerId = 'anthropic',
-  modelId = 'claude-sonnet-4-6'
+  modelId = 'claude-sonnet-4-6',
+  oemDiagrams: Array<{ src: string; caption: string }> = [],
 ): Promise<Scene3D> {
   const model = getModel(providerId, modelId);
 
@@ -106,12 +107,34 @@ export async function generateScene3D(
     .map((p) => `• ${p.name}${p.notes ? ` — ${p.notes}` : ''}`)
     .join('\n');
 
+  const oemNote = oemDiagrams.length > 0
+    ? `\nOEM SERVICE MANUAL DIAGRAMS: ${oemDiagrams.length} diagram(s) attached — these are authoritative technical reference images showing the actual part geometry and assembly layout. Captions: ${oemDiagrams.map(d => d.caption).join(' | ')}`
+    : '';
+
   const userText = [
     `VIDEO: ${guide.videoTitle}`,
     `SUMMARY: ${guide.summary}`,
     `\nIDENTIFIED PARTS:\n${partsText}`,
-    `\nCreate a 3D exploded-view scene for this repair assembly. Use the video frames to understand the actual component shapes and spatial relationships.`,
+    oemNote,
+    `\nCreate a 3D exploded-view scene. OEM diagrams (if provided) are your primary spatial reference. Video frames show what the technician is working on.`,
   ].join('\n');
+
+  // OEM diagrams first (highest quality reference), then video frames
+  const oemImageContent = oemDiagrams.slice(0, 4).map(({ src }) => ({
+    type: 'image' as const,
+    image: Buffer.from(src, 'base64'),
+    mimeType: 'image/png' as const,
+  }));
+
+  const frameImageContent = frames.slice(0, 6).map((b64) => ({
+    type: 'image' as const,
+    image: Buffer.from(b64, 'base64'),
+    mimeType: 'image/jpeg' as const,
+  }));
+
+  if (oemDiagrams.length > 0) {
+    console.log(`Scene3D: using ${oemDiagrams.length} OEM diagrams + ${Math.min(frames.length, 6)} video frames`);
+  }
 
   const result = await generateText({
     model,
@@ -129,12 +152,8 @@ export async function generateScene3D(
         role: 'user',
         content: [
           { type: 'text', text: userText },
-          // Send up to 6 frames — enough for shape/layout inference without huge payload
-          ...frames.slice(0, 6).map((b64) => ({
-            type: 'image' as const,
-            image: Buffer.from(b64, 'base64'),
-            mimeType: 'image/jpeg' as const,
-          })),
+          ...oemImageContent,   // OEM diagrams first — better spatial reference
+          ...frameImageContent, // then video frames for context
         ],
       },
     ],

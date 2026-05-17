@@ -6,8 +6,9 @@ export const maxDuration = 60;
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { frames, guide, provider, model } = body as {
+    const { frames, oemDiagrams, guide, provider, model } = body as {
       frames: string[];
+      oemDiagrams?: Array<{ src: string; caption: string }>;
       guide: SceneGuideContext;
       provider?: string;
       model?: string;
@@ -24,7 +25,8 @@ export async function POST(req: NextRequest) {
       frames,
       guide,
       provider ?? 'anthropic',
-      model ?? 'claude-sonnet-4-6'
+      model ?? 'claude-sonnet-4-6',
+      oemDiagrams ?? [],
     );
 
     return NextResponse.json({ scene });

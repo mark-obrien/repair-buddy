@@ -32,12 +32,21 @@ export function Scene3DTab({ guide, frames, provider, model }: Props) {
     setLoading(true);
     setError(null);
 
+    // Strip the data URI prefix so the route only receives raw base64
+    const oemDiagrams = (guide.manualDiagrams ?? [])
+      .slice(0, 4)
+      .map(({ src, caption }) => ({
+        src: src.replace(/^data:image\/[^;]+;base64,/, ''),
+        caption,
+      }));
+
     try {
       const res = await fetch('/api/scene3d', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           frames: frames.slice(0, 6),
+          oemDiagrams,
           guide: {
             videoTitle: guide.videoTitle,
             summary: guide.summary,
@@ -82,42 +91,59 @@ export function Scene3DTab({ guide, frames, provider, model }: Props) {
       <div className="text-5xl select-none">🧊</div>
 
       <div>
-        <h3 className="font-semibold text-gray-800 mb-1">AI-Generated 3D Schematic</h3>
-        <p className="text-sm text-gray-500 max-w-xs leading-relaxed">
-          Claude will analyze the video frames and build an interactive exploded-view
-          model of the repair components.
+        <h3 className="font-bold uppercase tracking-tight text-on-surface mb-1">AI-Generated 3D Schematic</h3>
+        <p className="text-sm text-on-surface-variant max-w-xs leading-relaxed">
+          Claude analyzes video frames{guide.manualDiagrams?.length ? ' and OEM service manual diagrams' : ''} to build an interactive exploded-view model of the repair components.
         </p>
       </div>
 
+      {guide.manualDiagrams && guide.manualDiagrams.length > 0 && (
+        <div className="flex items-center gap-2 bg-primary-fixed/40 border border-primary/20 rounded px-3 py-2 max-w-xs">
+          <span className="material-symbols-outlined text-primary text-sm">verified</span>
+          <p className="text-label-caps text-primary text-[10px] uppercase">
+            {guide.manualDiagrams.length} OEM diagram{guide.manualDiagrams.length !== 1 ? 's' : ''} will be used as reference
+          </p>
+        </div>
+      )}
+
       {frames.length === 0 && (
-        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 max-w-xs">
-          ⚠️ No frames available. Re-analyze the video to extract frames first.
-        </p>
+        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded px-3 py-2 max-w-xs">
+          <span className="material-symbols-outlined text-amber-600 text-sm">warning</span>
+          <p className="text-label-caps text-amber-700 text-[10px] uppercase">No frames available — re-analyze to extract frames</p>
+        </div>
       )}
 
       {error && (
-        <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 max-w-sm">
-          {error}
-        </p>
+        <div className="flex items-center gap-2 bg-error/5 border border-error/20 rounded px-3 py-2 max-w-sm">
+          <span className="material-symbols-outlined text-error text-sm">error</span>
+          <p className="text-label-caps text-error text-[10px] uppercase">{error}</p>
+        </div>
       )}
 
       <button
         onClick={generate}
         disabled={loading || frames.length === 0}
-        className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
+        className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-container disabled:opacity-40 disabled:cursor-not-allowed text-on-primary text-label-caps font-bold rounded shadow-sm active:scale-95 transition-all"
       >
         {loading ? (
           <>
-            <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-            Generating 3D scene…
+            <span className="w-4 h-4 border-2 border-on-primary/40 border-t-on-primary rounded-full animate-spin" />
+            GENERATING 3D SCENE...
           </>
         ) : (
-          '🧊 Generate 3D View'
+          <>
+            <span className="material-symbols-outlined text-sm">view_in_ar</span>
+            GENERATE 3D VIEW
+          </>
         )}
       </button>
 
       {frames.length > 0 && !loading && (
-        <p className="text-xs text-gray-400">{frames.length} frame{frames.length !== 1 ? 's' : ''} available · ~10–20s</p>
+        <p className="text-label-caps text-outline text-[10px] uppercase">
+          {frames.length} frame{frames.length !== 1 ? 's' : ''}
+          {guide.manualDiagrams?.length ? ` + ${guide.manualDiagrams.length} OEM diagram${guide.manualDiagrams.length !== 1 ? 's' : ''}` : ''}
+          {' '}· ~10–20s
+        </p>
       )}
     </div>
   );
