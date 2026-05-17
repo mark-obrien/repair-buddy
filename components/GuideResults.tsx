@@ -335,36 +335,55 @@ export function GuideResults({ guide, frames = [], provider = 'anthropic', model
                 )}
 
                 {/* OEM manual links */}
-                {guide.manualLinks && guide.manualLinks.length > 0 && (
-                  <section className="bg-surface-container-lowest border border-surface-container-highest rounded-lg overflow-hidden shadow-ambient">
-                    <div className="px-4 py-2.5 border-b border-surface-container-highest bg-surface-container-low flex items-center gap-2">
-                      <span className="material-symbols-outlined text-primary text-sm">menu_book</span>
-                      <span className="text-label-caps text-on-surface-variant text-[10px] uppercase tracking-widest font-bold">
-                        OEM Service Manual
-                      </span>
-                    </div>
-                    <div className="p-3 space-y-1">
-                      {guide.manualLinks.map((link, i) => (
-                        <a
-                          key={i}
-                          href={link.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`flex items-start gap-2 px-2 py-1.5 rounded hover:bg-surface-container-low transition-colors group ${
-                            i === 0 ? 'border-b border-surface-container-highest pb-2 mb-1' : ''
-                          }`}
-                        >
-                          <span className="material-symbols-outlined text-outline group-hover:text-primary text-sm mt-0.5 shrink-0 transition-colors">
-                            {i === 0 ? 'home_repair_service' : i === 1 ? 'list' : 'article'}
-                          </span>
-                          <span className="text-[11px] text-on-surface-variant group-hover:text-primary font-medium leading-tight transition-colors">
-                            {link.label}
-                          </span>
-                        </a>
-                      ))}
-                    </div>
-                  </section>
-                )}
+                {guide.manualLinks && guide.manualLinks.length > 0 && (() => {
+                  const byGroup = {
+                    vehicle:      guide.manualLinks.filter(l => l.group === 'vehicle'),
+                    'quick-lookup': guide.manualLinks.filter(l => l.group === 'quick-lookup'),
+                    section:      guide.manualLinks.filter(l => l.group === 'section'),
+                  };
+                  const groups: Array<{ key: string; label: string; links: typeof guide.manualLinks }> = [
+                    { key: 'vehicle',       label: 'Manual',        links: byGroup.vehicle },
+                    { key: 'quick-lookup',  label: 'Quick Lookups', links: byGroup['quick-lookup'] },
+                    { key: 'section',       label: 'Repair Sections Found', links: byGroup.section },
+                  ].filter(g => g.links && g.links.length > 0);
+
+                  return (
+                    <section className="bg-surface-container-lowest border border-surface-container-highest rounded-lg overflow-hidden shadow-ambient">
+                      <div className="px-4 py-2.5 border-b border-surface-container-highest bg-surface-container-low flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary text-sm">menu_book</span>
+                        <span className="text-label-caps text-on-surface-variant text-[10px] uppercase tracking-widest font-bold">
+                          OEM Service Manual
+                        </span>
+                      </div>
+                      <div className="divide-y divide-surface-container-highest">
+                        {groups.map(({ key, label, links }) => (
+                          <div key={key} className="p-3">
+                            <p className="text-label-caps text-outline text-[9px] uppercase tracking-widest mb-1.5">{label}</p>
+                            <div className="space-y-0.5">
+                              {links!.map((link, i) => (
+                                <a
+                                  key={i}
+                                  href={link.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface-container-low transition-colors group"
+                                >
+                                  <span className="material-symbols-outlined text-outline group-hover:text-primary text-sm shrink-0 transition-colors">
+                                    {link.icon}
+                                  </span>
+                                  <span className="text-[11px] text-on-surface-variant group-hover:text-primary font-medium leading-tight transition-colors">
+                                    {link.label}
+                                  </span>
+                                  <span className="material-symbols-outlined text-outline/40 group-hover:text-primary/60 text-xs ml-auto shrink-0 transition-colors">open_in_new</span>
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })()}
               </aside>
             </div>
         )}

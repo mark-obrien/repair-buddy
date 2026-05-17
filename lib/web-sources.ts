@@ -161,6 +161,8 @@ export interface ManualImage {
 export interface ManualLink {
   url: string;
   label: string;
+  group: 'vehicle' | 'quick-lookup' | 'section';
+  icon: string; // Material Symbol name
 }
 
 export interface LemonManualsResult {
@@ -559,20 +561,38 @@ export async function fetchLemonManualsVehicle(
     const combined = sectionTexts.filter(Boolean).join('\n\n');
     const uniqueImages = allImages.filter((img, i, arr) => arr.findIndex(x => x.url === img.url) === i);
 
-    // Build useful links: vehicle page, single-page index, and each fetched section
+    // Build the full set of useful links using the known URL patterns
+    const bundleUrl = bestModel.replace(LEMON_BASE + '/', LEMON_BASE + '/bundle/');
+
+    const vehicleLinks: ManualLink[] = [
+      { url: bestModel,    label: `${vehicle.make} ${resolvedYear} Service Manual`, group: 'vehicle', icon: 'home_repair_service' },
+      { url: repairIndexUrl, label: 'Full Repair & Diagnosis (searchable)', group: 'vehicle', icon: 'list' },
+      { url: `${bestModel}Labor%20Times/`, label: 'Labor Times', group: 'vehicle', icon: 'schedule' },
+      { url: bundleUrl, label: 'Download Offline ZIP', group: 'vehicle', icon: 'download' },
+    ];
+
+    const quickLookupLinks: ManualLink[] = [
+      { url: `${bestModel}Repair%20and%20Diagnosis/Quick%20Lookups/Fluids/`, label: 'Fluids & Capacities', group: 'quick-lookup', icon: 'water_drop' },
+      { url: `${bestModel}Repair%20and%20Diagnosis/Quick%20Lookups/DTC%20Index/`, label: 'DTC / Trouble Codes', group: 'quick-lookup', icon: 'error_outline' },
+      { url: `${bestModel}Repair%20and%20Diagnosis/Quick%20Lookups/Wiring%20Diagrams/System%20Wiring%20Diagrams/`, label: 'Wiring Diagrams', group: 'quick-lookup', icon: 'cable' },
+      { url: `${bestModel}Repair%20and%20Diagnosis/Quick%20Lookups/Technical%20Bulletins/Technical%20Service%20Bulletins/`, label: 'TSBs', group: 'quick-lookup', icon: 'campaign' },
+      { url: `${bestModel}Repair%20and%20Diagnosis/Quick%20Lookups/Technical%20Bulletins/Safety%20Recalls/`, label: 'Safety Recalls', group: 'quick-lookup', icon: 'warning' },
+    ];
+
     function sectionLabel(url: string): string {
-      // Decode and strip the vehicle base and leading path segment
       const decoded = decodeURIComponent(url.replace(bestModel, '').replace(/\/$/, ''));
-      // Take the last meaningful path segment as the label
       const parts = decoded.split('/').filter(Boolean);
       return parts[parts.length - 1] ?? decoded;
     }
 
-    const manualLinks: ManualLink[] = [
-      { url: bestModel, label: `${vehicle.make} ${resolvedYear} — Service Manual` },
-      { url: repairIndexUrl, label: 'Full Repair & Diagnosis Index' },
-      ...rankedSections.map(({ url }) => ({ url, label: sectionLabel(url) })),
-    ];
+    const sectionLinks: ManualLink[] = rankedSections.map(({ url }) => ({
+      url,
+      label: sectionLabel(url),
+      group: 'section' as const,
+      icon: 'article',
+    }));
+
+    const manualLinks: ManualLink[] = [...vehicleLinks, ...quickLookupLinks, ...sectionLinks];
 
     console.log(`lemon-manuals: ${combined.length} chars + ${uniqueImages.length} diagrams + ${manualLinks.length} links for ${vehicle.make} ${resolvedYear}`);
 
