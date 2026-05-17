@@ -585,14 +585,14 @@ export async function fetchLemonManualsVehicle(
       return parts[parts.length - 1] ?? decoded;
     }
 
-    const sectionLinks: ManualLink[] = rankedSections.map(({ url }) => ({
+    const sectionManualLinks: ManualLink[] = rankedSections.map(({ url }) => ({
       url,
       label: sectionLabel(url),
       group: 'section' as const,
       icon: 'article',
     }));
 
-    const manualLinks: ManualLink[] = [...vehicleLinks, ...quickLookupLinks, ...sectionLinks];
+    const manualLinks: ManualLink[] = [...vehicleLinks, ...quickLookupLinks, ...sectionManualLinks];
 
     console.log(`lemon-manuals: ${combined.length} chars + ${uniqueImages.length} diagrams + ${manualLinks.length} links for ${vehicle.make} ${resolvedYear}`);
 
