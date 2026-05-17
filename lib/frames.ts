@@ -21,9 +21,23 @@ if (FFMPEG_PATH) {
   ffmpeg.setFfmpegPath(FFMPEG_PATH);
 }
 
-const FRAME_COUNT = 8;
 const FRAME_WIDTH = 640;
 const JPEG_QUALITY = 4;
+
+/**
+ * Scale frame count with video duration so short clips get reasonable
+ * coverage and long tutorials get enough frames to illustrate each step.
+ *   < 3 min  →  4 frames
+ *   3–8 min  →  8 frames
+ *   8–20 min → 12 frames
+ *   > 20 min → 16 frames
+ */
+function getFrameCount(durationSeconds: number): number {
+  if (durationSeconds < 180) return 4;
+  if (durationSeconds < 480) return 8;
+  if (durationSeconds < 1200) return 12;
+  return 16;
+}
 
 export interface FrameExtractionResult {
   frames: string[];
@@ -100,7 +114,8 @@ export async function extractVideoFrames(
   videoUrl: string,
   durationSeconds: number
 ): Promise<FrameExtractionResult> {
-  const timestamps = getFrameTimestamps(durationSeconds, FRAME_COUNT);
+  const frameCount = getFrameCount(durationSeconds);
+  const timestamps = getFrameTimestamps(durationSeconds, frameCount);
   if (timestamps.length === 0) {
     return { frames: [], count: 0 };
   }

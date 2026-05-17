@@ -132,11 +132,15 @@ SPECIALTY TOOLS: Identify non-standard tools. Always note purpose and any DIY al
 
 TORQUE VALUES: Extract every torque specification precisely as stated — never round or estimate.
 
-REPAIR STEPS: Extract 8-20 logical, actionable steps. Include step-specific warnings inline. The transcript contains [MM:SS] timestamp markers every ~10 seconds — for each step, find the [MM:SS] marker that immediately precedes the relevant transcript text and return that exact string as the timestamp. Do NOT calculate total seconds.
+REPAIR STEPS: Extract 8-20 logical, actionable steps in the exact order performed. For each step:
+- Write the description in second person ("Remove the...", "Apply...") with enough detail to execute without watching the video.
+- Include specific measurements, socket sizes, torque values, and directional cues (clockwise/counterclockwise, left-to-right, etc.) wherever mentioned.
+- If the presenter warns about a common mistake or gotcha mid-step, capture it as a step-level warning.
+- Timestamp: find the [MM:SS] marker that immediately precedes this step's transcript text and return that exact string. Do NOT calculate total seconds.
 
-FRAME INDEXING: When video frames are provided, they are attached as images in chronological order, indexed 0..N-1. For each step, set frameIndex to the 0-based index of the frame that best illustrates it. Omit if no frame clearly fits. Do NOT invent an index outside the provided range.
+FRAME INDEXING: When video frames are provided, they are attached as images in chronological order, indexed 0..N-1. For each step, set frameIndex to the 0-based index of the frame that best illustrates it — prefer frames that show hands working on a component over static shots. Omit if no frame clearly fits. Do NOT invent an index outside the provided range.
 
-FRAME ANNOTATIONS: For any frame that clearly shows key parts or tools, generate an entry in frameAnnotations with approximate X/Y percentages (0-100) from the top-left corner.
+FRAME ANNOTATIONS: For any frame that clearly shows labellable parts or tools, generate an entry in frameAnnotations. Coordinates are X/Y percentages (0-100) from the top-left corner. Prefer specific part names over generic labels like "part 1".
 
 WARNINGS: Extract all safety warnings, common mistakes, and gotchas.
 
@@ -144,10 +148,17 @@ PROCESS DIAGRAM: Valid Mermaid flowchart TD showing the repair workflow. 8-15 st
 
 PARTS DIAGRAM: A clean SVG schematic (viewBox 0 0 800 600).
 - White background: <rect width="800" height="600" fill="white"/>
-- Title: centered bold text at y=30, font-size 18
+- Title: centered bold text at y=30, font-size 18, fill="#191c1e"
 - Components in center region (x: 60–720, y: 50–490); legend bottom-right (x≈540, y≈495)
-- Meaningful shapes, not generic boxes. Fill by type: primary=#fed7aa/#f97316, structural=#e2e8f0/#94a3b8, fasteners=#fef9c3/#ca8a04, seals=#dcfce7/#16a34a, sensors=#dbeafe/#2563eb, rotating=#f3e8ff/#9333ea, fluid=#cffafe/#0891b2
-- Labels outside shapes with dashed leader lines. No overlapping labels. Min 20px gap between shapes.
+- Meaningful shapes, not generic boxes. Fill colors by component type (light fill / dark stroke):
+    primary parts:   fill="#dbe1ff" stroke="#004cca"
+    structural:      fill="#e0e3e5" stroke="#51585e"
+    fasteners:       fill="#fef9c3" stroke="#ca8a04"
+    seals/gaskets:   fill="#dcfce7" stroke="#16a34a"
+    sensors/elec:    fill="#dbeafe" stroke="#2563eb"
+    rotating parts:  fill="#f3e8ff" stroke="#9333ea"
+    fluid/hoses:     fill="#cffafe" stroke="#0891b2"
+- Labels outside shapes with dashed leader lines (stroke="#737687" stroke-dasharray="4,2"). No overlapping labels. Min 20px gap between shapes.
 - NO script tags, NO event handlers, NO external hrefs
 - Must include xmlns="http://www.w3.org/2000/svg"
 

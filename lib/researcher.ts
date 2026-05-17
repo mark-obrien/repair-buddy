@@ -2,6 +2,27 @@ import { generateText } from 'ai';
 import { getModel } from './providers';
 import { fetchLemonManuals, fetchIFixit } from './web-sources';
 
+/**
+ * Strip common YouTube title filler so external searches get cleaner queries.
+ * e.g. "How to Replace Front Brake Pads on a 2019 Honda Accord (EASY DIY!)"
+ *   → "Replace Front Brake Pads 2019 Honda Accord"
+ */
+function cleanSearchQuery(title: string): string {
+  return title
+    // Remove parenthetical / bracketed asides: (EASY DIY!), [4K], etc.
+    .replace(/\(.*?\)/g, '')
+    .replace(/\[.*?\]/g, '')
+    // Remove common lead-in phrases
+    .replace(/^(how\s+to|how\s+i|diy|easy|quick|step[\s-]by[\s-]step|complete\s+guide|tutorial|the\s+ultimate|watch\s+me|let['']?s|i\s+fixed|i\s+replaced|fixing|replacing|repairing)\s+/gi, '')
+    // Remove common filler connectors
+    .replace(/\b(at\s+home|on\s+a|on\s+my|in\s+minutes?|for\s+beginners?|with\s+basic\s+tools?)\b/gi, '')
+    // Collapse excess whitespace
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+    // Cap to 80 chars so API URLs don't blow up
+    .slice(0, 80);
+}
+
 const RESEARCH_SYSTEM_PROMPT = `You are a master repair technician with encyclopedic knowledge across automotive, home improvement, appliances, electronics, outdoor equipment, and general DIY repair.
 
 When given a repair video title, identify the repair domain and provide a concise but thorough research summary covering:
@@ -28,9 +49,12 @@ export async function researchRepairTopic(
   const researchModelId = getResearchModel(providerId, modelId);
   const model = getModel(providerId, researchModelId);
 
+  const searchQuery = cleanSearchQuery(videoTitle);
+  console.log(`Research query: "${searchQuery}" (from title: "${videoTitle}")`);
+
   const [lemonContent, ifixitContent, aiResult] = await Promise.all([
-    fetchLemonManuals(videoTitle),
-    fetchIFixit(videoTitle),
+    fetchLemonManuals(searchQuery),
+    fetchIFixit(searchQuery),
     generateText({
       model,
       maxTokens: 1500,
