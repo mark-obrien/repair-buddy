@@ -230,8 +230,12 @@ function parseSectionLinks(html: string, vehicleBaseUrl: string): string[] {
     // Resolve relative URLs
     if (href.startsWith('/')) href = `${LEMON_BASE}${href}`;
     if (!href.startsWith(vehicleBaseUrl)) continue;
-    // Skip the index page itself and download/labor pages
-    if (/\/(Repair%20and%20Diagnosis|Labor|Download)/i.test(href)) continue;
+    // Skip bare index pages and non-repair pages.
+    // Must NOT skip content pages which also contain "Repair%20and%20Diagnosis" in their path.
+    if (/\/(Labor|Download|bundle)\//i.test(href)) continue;
+    // Skip if the URL ends at exactly the index level (no sub-section after it)
+    if (/Repair%20and%20Diagnosis%20%28Single%20Page%29\/?$/i.test(href)) continue;
+    if (/Repair%20and%20Diagnosis\/?$/i.test(href)) continue;
     if (!seen.has(href)) { seen.add(href); links.push(href); }
   }
   return links;
