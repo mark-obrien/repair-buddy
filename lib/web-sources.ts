@@ -68,7 +68,7 @@ function detectSearchUrl(baseUrl: string, html: string): string {
 // Vehicle extraction from video title
 // ---------------------------------------------------------------------------
 
-const KNOWN_MAKES = [
+export const KNOWN_MAKES = [
   'Acura', 'Alfa Romeo', 'Audi', 'BMW', 'Buick', 'Cadillac', 'Chevrolet',
   'Chrysler', 'Dodge', 'Ferrari', 'Fiat', 'Ford', 'GMC', 'Genesis', 'Honda',
   'Hyundai', 'Infiniti', 'Jaguar', 'Jeep', 'Kia', 'Land Rover', 'Lexus',

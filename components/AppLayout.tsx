@@ -33,6 +33,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const navItems = [
     { id: 'dashboard', icon: 'dashboard', label: 'Dashboard', href: '/dashboard' },
     { id: 'guides', icon: 'menu_book', label: 'Guide Library', href: '/guides' },
+    { id: 'manuals', icon: 'import_contacts', label: 'OEM Manuals', href: '/manuals' },
     { id: 'generator', icon: 'construction', label: 'Generator', href: '/' },
     { id: 'settings', icon: 'settings', label: 'Settings', href: '/settings' },
   ];
@@ -95,7 +96,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
         <div className="flex flex-col flex-1">
           {navItems.map((item) => {
-            const isActive = pathname === item.href || (item.href === '/' && pathname.startsWith('/g/'));
+            const isActive = pathname === item.href || (item.href === '/' && pathname.startsWith('/g/')) || (item.href !== '/' && pathname.startsWith(item.href));
             return (
               <Link
                 key={item.id}
@@ -138,7 +139,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
         <div className="flex flex-col flex-1">
           {navItems.map((item) => {
-            const isActive = pathname === item.href || (item.href === '/' && pathname.startsWith('/g/'));
+            const isActive = pathname === item.href || (item.href === '/' && pathname.startsWith('/g/')) || (item.href !== '/' && pathname.startsWith(item.href));
             return (
               <Link
                 key={item.id}
