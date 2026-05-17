@@ -218,6 +218,9 @@ export async function generateRepairGuide(
     attempt: number,
     frameSubset: string[] = imageContent,
   ) {
+    const textBytes = Buffer.byteLength(userText, 'utf8');
+    console.log(`Attempt ${attempt}: text=${textBytes} bytes, frames=${frameSubset.length}`);
+
     let res;
     try {
       res = await generateText({
@@ -240,14 +243,19 @@ export async function generateRepairGuide(
         abortSignal: undefined,
       });
     } catch (err) {
-      // AI SDK threw — surface the real error message
-      const msg = err instanceof Error ? err.message : String(err);
-      throw new Error(`API error on attempt ${attempt}: ${msg}`);
+      // Surface the full error — includes API status codes, rate limit details, etc.
+      const raw = err instanceof Error ? err : new Error(String(err));
+      const detail = (raw as any).responseBody ?? (raw as any).data ?? '';
+      throw new Error(`API error on attempt ${attempt}: ${raw.message}${detail ? ` — ${JSON.stringify(detail)}` : ''}`);
     }
 
     const warnings = (res as any).warnings;
-    if (warnings?.length) console.warn(`Attempt ${attempt} warnings:`, warnings);
-    console.log(`Guide generation attempt ${attempt}: finishReason=${res.finishReason} toolCalls=${res.toolCalls.length} frames=${frameSubset.length}`);
+    if (warnings?.length) console.warn(`Attempt ${attempt} warnings:`, JSON.stringify(warnings));
+    const rawResp = (res as any).response;
+    if (res.finishReason === 'error' && rawResp) {
+      console.error(`Attempt ${attempt} raw response:`, JSON.stringify(rawResp).slice(0, 500));
+    }
+    console.log(`Attempt ${attempt}: finishReason=${res.finishReason} toolCalls=${res.toolCalls.length}`);
     return res;
   }
 

@@ -174,7 +174,7 @@ export async function POST(request: Request) {
   const sectionIndex = researchResult.sectionIndex;
   const vehicleBaseUrl = researchResult.vehicleBaseUrl;
 
-  if (researchContext) console.log(`Research context: ${researchContext.length} chars`);
+  console.log(`Input sizes — transcript: ${transcriptText.length} chars, research: ${researchContext.length} chars, frames: ${frames.length}, sectionIndex: ${sectionIndex.length} URLs`);
   if (manualImageUrls.length) console.log(`Manual diagrams found: ${manualImageUrls.length}`);
   if (commentsContext) console.log(`Comments context: ${commentsContext.split('\n').length} comments`);
 
