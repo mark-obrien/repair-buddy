@@ -149,7 +149,7 @@ export function GuideResults({ guide, frames = [], provider = 'anthropic', model
                       )}
                       {activeTab === 'warnings' && <WarningsTab warnings={guide.warnings} />}
                       {activeTab === 'shopping' && <ShoppingTab parts={guide.partsNeeded} vehicleInfo={guide.vehicleInfo} />}
-                      {activeTab === 'parts-diagram' && <PartsDiagramTab partsDiagram={guide.partsDiagram} />}
+                      {activeTab === 'parts-diagram' && <PartsDiagramTab partsDiagram={guide.partsDiagram} manualDiagrams={guide.manualDiagrams} />}
                       {activeTab === 'diagram' && <DiagramTab diagram={guide.diagram} />}
                     </div>
 

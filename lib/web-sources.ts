@@ -94,6 +94,16 @@ export interface VehicleHint {
   modelWords: string[];
 }
 
+export interface ManualImage {
+  url: string;       // absolute URL to the image on lemon-manuals.la
+  caption: string;   // surrounding text used as the figure caption
+}
+
+export interface LemonManualsResult {
+  text: string;
+  images: ManualImage[];
+}
+
 /**
  * Convert a 2-digit year string to a full 4-digit year.
  * 60-99 → 1960-1999, 00-26 → 2000-2026.
@@ -228,6 +238,42 @@ function parseSectionLinks(html: string, vehicleBaseUrl: string): string[] {
 }
 
 /**
+ * Extract OEM diagram image URLs and captions from a Lemon Manuals page.
+ * Images live at /images25/{id}/ and are served as PNG.
+ */
+function extractManualImages(html: string, caption: string): ManualImage[] {
+  const images: ManualImage[] = [];
+  const seen = new Set<string>();
+
+  // Match <img src="/images25/..."> or <img src="https://lemon-manuals.la/images25/...">
+  const imgPattern = /src=["']((?:https?:\/\/lemon-manuals\.la)?\/images25\/[^"']+)["']/gi;
+  // Also capture the nearest surrounding figure caption text
+  const figPattern = /<(?:figcaption|p|td|div)[^>]*>(.*?)<\/(?:figcaption|p|td|div)>/gi;
+
+  // Build a list of text snippets near each image for captioning
+  const textSnippets: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = figPattern.exec(html)) !== null) {
+    const text = stripHtml(m[1]).trim();
+    if (text.length > 5 && text.length < 200) textSnippets.push(text);
+  }
+
+  let imgIdx = 0;
+  while ((m = imgPattern.exec(html)) !== null) {
+    let url = m[1];
+    if (!url.startsWith('http')) url = `${LEMON_BASE}${url}`;
+    if (seen.has(url)) continue;
+    seen.add(url);
+    // Try to find a caption near this image index
+    const figCaption = textSnippets[imgIdx] ?? caption;
+    images.push({ url, caption: figCaption });
+    imgIdx++;
+  }
+
+  return images;
+}
+
+/**
  * Score a section link by keyword relevance to the repair topic.
  */
 function scoreSectionLink(url: string, keywordsLower: string[]): number {
@@ -247,7 +293,8 @@ function scoreSectionLink(url: string, keywordsLower: string[]): number {
 export async function fetchLemonManualsVehicle(
   vehicle: VehicleHint,
   repairQuery: string
-): Promise<string> {
+): Promise<LemonManualsResult> {
+  const empty: LemonManualsResult = { text: '', images: [] };
   try {
     // ── 1. Fetch the make/year listing to find exact model URLs ──────────
     // Try the extracted year first; if that yields no models (e.g. the title
@@ -272,7 +319,7 @@ export async function fetchLemonManualsVehicle(
 
     if (modelLinks.length === 0) {
       console.warn(`lemon-manuals: no model links found for ${vehicle.make} ${vehicle.year}±3`);
-      return '';
+      return empty;
     }
 
     // ── 2. Pick the best-matching model URL ──────────────────────────────
@@ -310,13 +357,18 @@ export async function fetchLemonManualsVehicle(
 
     // ── 5. Fetch section pages in parallel ───────────────────────────────
     const chunkSize = Math.floor(MAX_CONTENT_CHARS / Math.max(rankedSections.length, 1));
+    const allImages: ManualImage[] = [];
+
     const sectionTexts = await Promise.all(
       rankedSections.map(async ({ url }) => {
         try {
           const pageHtml = await fetchWithTimeout(url);
+          const label = decodeURIComponent(url.replace(bestModel, '').replace(/\/$/, ''));
+          // Extract images before stripping HTML
+          const images = extractManualImages(pageHtml, label);
+          allImages.push(...images);
           const text = extractMainText(pageHtml).slice(0, chunkSize);
           if (text.length < 80) return '';
-          const label = decodeURIComponent(url.replace(bestModel, '').replace(/\/$/, ''));
           return `[Lemon Manuals — ${label}]\n${text}`;
         } catch {
           return '';
@@ -325,14 +377,18 @@ export async function fetchLemonManualsVehicle(
     );
 
     const combined = sectionTexts.filter(Boolean).join('\n\n');
-    if (!combined) return '';
+    const uniqueImages = allImages.filter((img, i, arr) => arr.findIndex(x => x.url === img.url) === i);
 
-    console.log(`lemon-manuals: ${combined.length} chars from OEM manual for ${vehicle.make} ${vehicle.year}`);
-    return combined.slice(0, MAX_CONTENT_CHARS * 2);  // allow more chars since it's real OEM data
+    console.log(`lemon-manuals: ${combined.length} chars + ${uniqueImages.length} diagrams from OEM manual for ${vehicle.make} ${resolvedYear}`);
+
+    return {
+      text: combined.slice(0, MAX_CONTENT_CHARS * 2),
+      images: uniqueImages.slice(0, 12), // cap at 12 diagrams
+    };
 
   } catch (err) {
     console.warn('lemon-manuals vehicle fetch skipped:', err instanceof Error ? err.message : err);
-    return '';
+    return empty;
   }
 }
 

@@ -109,14 +109,40 @@ export async function POST(request: Request) {
 
   // Three non-fatal parallel calls: research, frames, comments. Any can fail
   // silently and the guide still generates — they only enhance quality.
-  const [researchContext, frames, commentsContext] = await Promise.all([
+  const [researchResult, frames, commentsContext] = await Promise.all([
     researchRepairTopic(metadata.title, provider, model),
     useFrames ? tryExtractFrames(url.trim(), durationSeconds) : Promise.resolve([]),
     fetchTopComments(videoId),
   ]);
 
+  const researchContext = researchResult.text;
+  const manualImageUrls = researchResult.manualImages;
+
   if (researchContext) console.log(`Research context: ${researchContext.length} chars`);
+  if (manualImageUrls.length) console.log(`Manual diagrams found: ${manualImageUrls.length}`);
   if (commentsContext) console.log(`Comments context: ${commentsContext.split('\n').length} comments`);
+
+  // Fetch OEM manual diagrams as base64 (non-fatal — server-side avoids CORS)
+  async function fetchImageAsBase64(imageUrl: string): Promise<string | null> {
+    try {
+      const res = await fetch(imageUrl, { signal: AbortSignal.timeout(6_000) });
+      if (!res.ok) return null;
+      const buffer = await res.arrayBuffer();
+      return Buffer.from(buffer).toString('base64');
+    } catch {
+      return null;
+    }
+  }
+
+  const manualDiagramsRaw = manualImageUrls.length > 0
+    ? await Promise.all(
+        manualImageUrls.slice(0, 8).map(async ({ url: imgUrl, caption }) => {
+          const src = await fetchImageAsBase64(imgUrl);
+          return src ? { src: `data:image/png;base64,${src}`, caption } : null;
+        })
+      )
+    : [];
+  const manualDiagrams = manualDiagramsRaw.filter((d): d is { src: string; caption: string } => d !== null);
 
   const commentsAnalyzed = commentsContext ? commentsContext.split('\n').filter(Boolean).length : 0;
 
@@ -133,6 +159,12 @@ export async function POST(request: Request) {
       model,
       durationSeconds
     );
+
+    // Attach OEM diagrams to the guide object
+    if (manualDiagrams.length > 0) {
+      guide.manualDiagrams = manualDiagrams;
+      console.log(`Attached ${manualDiagrams.length} OEM diagrams to guide`);
+    }
 
     const responsePayload = {
       guide,

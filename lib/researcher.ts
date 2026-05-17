@@ -1,6 +1,8 @@
 import { generateText } from 'ai';
 import { getModel } from './providers';
-import { fetchLemonManuals, fetchLemonManualsVehicle, fetchIFixit, extractVehicleHint } from './web-sources';
+import { fetchLemonManuals, fetchLemonManualsVehicle, fetchIFixit, extractVehicleHint, type ManualImage } from './web-sources';
+
+export type { ManualImage };
 
 const RESEARCH_SYSTEM_PROMPT = `You are a master repair technician with encyclopedic knowledge across automotive, home improvement, appliances, electronics, outdoor equipment, and general DIY repair.
 
@@ -36,11 +38,16 @@ function cleanSearchQuery(title: string): string {
     .slice(0, 80);
 }
 
+export interface ResearchResult {
+  text: string;
+  manualImages: ManualImage[];
+}
+
 export async function researchRepairTopic(
   videoTitle: string,
   providerId: string,
   modelId: string
-): Promise<string> {
+): Promise<ResearchResult> {
   const researchModelId = getResearchModel(providerId, modelId);
   const model = getModel(providerId, researchModelId);
 
@@ -57,9 +64,9 @@ export async function researchRepairTopic(
   // Fallback does a generic keyword search.
   const lemonFetch = vehicle
     ? fetchLemonManualsVehicle(vehicle, searchQuery)
-    : fetchLemonManuals(searchQuery);
+    : fetchLemonManuals(searchQuery).then((text) => ({ text, images: [] }));
 
-  const [lemonContent, ifixitContent, aiResult] = await Promise.all([
+  const [lemonResult, ifixitContent, aiResult] = await Promise.all([
     lemonFetch,
     fetchIFixit(searchQuery),
     generateText({
@@ -76,14 +83,18 @@ export async function researchRepairTopic(
 
   const parts: string[] = [];
   if (aiResult?.text) parts.push(aiResult.text);
-  if (lemonContent) {
+  if (lemonResult.text) {
     const label = vehicle
       ? `OEM SERVICE MANUAL (lemon-manuals.la — ${vehicle.make} ${vehicle.year})`
       : 'MANUAL SOURCE (lemon-manuals.la)';
-    parts.push(`\n---\n${label}:\n${lemonContent}`);
+    parts.push(`\n---\n${label}:\n${lemonResult.text}`);
   }
   if (ifixitContent) parts.push(`\n---\nREPAIR GUIDE SOURCE (iFixit):\n${ifixitContent}`);
-  return parts.join('\n');
+
+  return {
+    text: parts.join('\n'),
+    manualImages: lemonResult.images ?? [],
+  };
 }
 
 function getResearchModel(providerId: string, selectedModelId: string): string {
