@@ -187,8 +187,8 @@ function expandTwoDigitYear(twoDigit: string): string {
 /**
  * Extract make, year, and likely model words from a video title.
  * Handles both 4-digit years ("2014") and 2-digit year ranges ("07-14").
- * When no year is found, returns the current year so the vehicle-aware
- * fetcher can still attempt navigation (it tries ±3 years anyway).
+ * Returns null if either make or year can't be confidently identified —
+ * a generic engine/part video with no model year should not guess one.
  */
 export function extractVehicleHint(title: string): VehicleHint | null {
   const lower = title.toLowerCase();
@@ -222,13 +222,7 @@ export function extractVehicleHint(title: string): VehicleHint | null {
     }
   }
 
-  if (!make) return null;
-
-  // If no year was found but we have a make, use the current year as a starting
-  // point — fetchLemonManualsVehicle tries offsets in both directions.
-  if (!year) {
-    year = String(new Date().getFullYear());
-  }
+  if (!make || !year) return null;
 
   // Grab model words from the full title (not just after the make) by stripping
   // known noise words and the make/year tokens themselves.

@@ -175,6 +175,18 @@ function secondsToHms(totalSeconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+/**
+ * Strip control characters and unpaired surrogates that can survive HTML
+ * scraping (Lemon Manuals / iFixit) and confuse stricter providers like
+ * Gemini's function-calling input validation.
+ */
+function sanitizeText(text: string): string {
+  return text
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    .replace(/[\uD800-\uDFFF]/g, '')
+    .replace(/ {3,}/g, '  ');
+}
+
 export async function generateRepairGuide(
   transcript: string,
   videoTitle: string,
@@ -189,23 +201,31 @@ export async function generateRepairGuide(
 ): Promise<RepairGuide> {
   const model = getModel(providerId, modelId);
 
-  const frameNote = frames.length > 0
-    ? `\n\n${frames.length} VIDEO FRAMES are attached (chronological, 10%–85% of duration, indexed 0..${frames.length - 1}). Use them to identify component shapes and to set frameIndex on each repair step.`
-    : '';
+  transcript = sanitizeText(transcript);
+  researchContext = sanitizeText(researchContext);
+  commentsContext = sanitizeText(commentsContext);
 
-  const researchNote = researchContext
-    ? `\n\nREPAIR RESEARCH CONTEXT (authoritative background — cross-reference with video):\n${researchContext}`
-    : '';
+  function buildUserText(frameCount: number, researchCtx: string): string {
+    const frameNote = frameCount > 0
+      ? `\n\n${frameCount} VIDEO FRAMES are attached (chronological, 10%–85% of duration, indexed 0..${frameCount - 1}). Use them to identify component shapes and to set frameIndex on each repair step.`
+      : '';
 
-  const commentsNote = commentsContext
-    ? `\n\nVIEWER COMMENTS (top-rated, may contain corrections or model-year notes):\n${commentsContext}`
-    : '';
+    const researchNote = researchCtx
+      ? `\n\nREPAIR RESEARCH CONTEXT (authoritative background — cross-reference with video):\n${researchCtx}`
+      : '';
 
-  const durationNote = durationSeconds > 0
-    ? `\nVIDEO DURATION: ${secondsToHms(durationSeconds)} (${Math.round(durationSeconds)}s) — timestamps MUST be within this range.`
-    : '';
+    const commentsNote = commentsContext
+      ? `\n\nVIEWER COMMENTS (top-rated, may contain corrections or model-year notes):\n${commentsContext}`
+      : '';
 
-  const userText = `VIDEO TITLE: ${videoTitle}\nVIDEO URL: ${videoUrl}${durationNote}${researchNote}${commentsNote}${frameNote}\n\nTRANSCRIPT:\n${transcript}`;
+    const durationNote = durationSeconds > 0
+      ? `\nVIDEO DURATION: ${secondsToHms(durationSeconds)} (${Math.round(durationSeconds)}s) — timestamps MUST be within this range.`
+      : '';
+
+    return `VIDEO TITLE: ${videoTitle}\nVIDEO URL: ${videoUrl}${durationNote}${researchNote}${commentsNote}${frameNote}\n\nTRANSCRIPT:\n${transcript}`;
+  }
+
+  let userText = buildUserText(frames.length, researchContext);
 
   const imageContent = frames.map((b64) => ({
     type: 'image' as const,
@@ -269,17 +289,23 @@ export async function generateRepairGuide(
     result = await callModel(reducedSchema as typeof repairGuideSchema, 2);
   }
 
-  // Attempt 3 — drop images entirely if still failing (transcript-only fallback)
+  // Attempt 3 — still erroring: this isn't a size issue (attempt 2 already shrank the
+  // schema), so aggressively cut research context and drop frames/annotations entirely
+  // in case unsanitized scraped text is the culprit, and rebuild the prompt.
   if (!result.toolCalls[0] || result.finishReason === 'error') {
-    console.warn(`Retrying with no frames (finishReason=${result.finishReason})`);
+    console.warn(`Retrying with truncated research context + no frames (finishReason=${result.finishReason})`);
+    userText = buildUserText(0, researchContext.slice(0, 1500));
     const reducedSchema = repairGuideSchema.omit({ partsDiagram: true, frameAnnotations: true });
     result = await callModel(reducedSchema as typeof repairGuideSchema, 3, []);
   }
 
   const toolCall = result.toolCalls[0];
   if (!toolCall) {
+    const providerHint = providerId !== 'anthropic'
+      ? ` This consistently fails with ${providerId}/${modelId} regardless of input size — try switching to Anthropic Claude, which this guide's schema is tested against.`
+      : '';
     throw new Error(
-      `Model did not return structured repair guide data after 3 attempts (finishReason=${result.finishReason}, text length=${result.text?.length ?? 0}).`
+      `Model did not return structured repair guide data after 3 attempts (finishReason=${result.finishReason}, text length=${result.text?.length ?? 0}).${providerHint}`
     );
   }
 
